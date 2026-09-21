@@ -24,6 +24,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "class_id",
         as: "TeacherAssignments"
       });
+      Class.hasMany(models.ReportCard, {
+        foreignKey: "class_id",
+        as: "ReportCards"
+      });
     }
   }
   Class.init({

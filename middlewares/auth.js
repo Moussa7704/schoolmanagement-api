@@ -1,5 +1,5 @@
 const { verifyAccessToken } = require("../utils/jwt")
-const { User, Role, Permission } = require("../models")
+const { User, Role, Permission, Teacher } = require("../models")
 const roles = require("../constants/roles")
 
 const authenticate = async (req, res, next) => {
@@ -22,6 +22,10 @@ const authenticate = async (req, res, next) => {
                     model: Permission,
                     as: 'Permissions'
                 }]
+            }, {
+                model: Teacher,
+                as: 'Teacher',
+                required: false
             }],
             attributes: {
                 exclude: ['password']

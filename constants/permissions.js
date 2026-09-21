@@ -62,5 +62,20 @@ module.exports = {
 
     TEACHER_ASSIGNMENTS_VIEW: "teacher_assignments.view",
     TEACHER_ASSIGNMENTS_CREATE: "teacher_assignments.create",
-    TEACHER_ASSIGNMENTS_DELETE: "teacher_assignments.delete"
+    TEACHER_ASSIGNMENTS_DELETE: "teacher_assignments.delete",
+
+    ASSESSMENTS_VIEW: "assessments.view",
+    ASSESSMENTS_CREATE: "assessments.create",
+    ASSESSMENTS_UPDATE: "assessments.update",
+    ASSESSMENTS_DELETE: "assessments.delete",
+
+    GRADES_VIEW: "grades.view",
+    GRADES_CREATE: "grades.create",
+    GRADES_UPDATE: "grades.update",
+    GRADES_DELETE: "grades.delete",
+
+    REPORT_CARDS_VIEW: "report_cards.view",
+    REPORT_CARDS_CREATE: "report_cards.create",
+    REPORT_CARDS_DELETE: "report_cards.delete",
+    REPORT_CARDS_VALIDATE: "report_cards.validate"
 };

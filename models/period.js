@@ -14,6 +14,14 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "academic_year_id",
         as: "AcademicYear"
       });
+      Period.hasMany(models.Assessment, {
+        foreignKey: "period_id",
+        as: "Assessments"
+      });
+      Period.hasMany(models.ReportCard, {
+        foreignKey: "period_id",
+        as: "ReportCards"
+      });
     }
   }
   Period.init({

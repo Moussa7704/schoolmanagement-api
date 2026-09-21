@@ -26,6 +26,7 @@ app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec,
     }
 ));
 
+// Routes
 const authRoutes = require("./routes/auth")
 const schoolRoutes = require("./routes/school")
 const academicYearRoutes = require("./routes/academicyear")
@@ -38,6 +39,9 @@ const subjectRoutes = require("./routes/subject")
 const classRoutes = require("./routes/class")
 const enrollmentRoutes = require("./routes/enrollment")
 const teacherAssignmentRoutes = require("./routes/teacherassignment")
+const assessmentRoutes = require("./routes/assessment")
+const gradeRoutes = require("./routes/grade")
+const reportCardRoutes = require("./routes/reportcard")
 
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/schools', schoolRoutes)
@@ -51,6 +55,9 @@ app.use('/api/v1/subjects', subjectRoutes)
 app.use('/api/v1/classes', classRoutes)
 app.use('/api/v1/enrollments', enrollmentRoutes)
 app.use('/api/v1/teacher-assignments', teacherAssignmentRoutes)
+app.use('/api/v1/assessments', assessmentRoutes)
+app.use('/api/v1/grades', gradeRoutes)
+app.use('/api/v1/report-cards', reportCardRoutes)
 
 
 
