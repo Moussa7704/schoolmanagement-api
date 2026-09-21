@@ -77,5 +77,10 @@ module.exports = {
     REPORT_CARDS_VIEW: "report_cards.view",
     REPORT_CARDS_CREATE: "report_cards.create",
     REPORT_CARDS_DELETE: "report_cards.delete",
-    REPORT_CARDS_VALIDATE: "report_cards.validate"
+    REPORT_CARDS_VALIDATE: "report_cards.validate",
+
+    ATTENDANCES_VIEW: "attendances.view",
+    ATTENDANCES_CREATE: "attendances.create",
+    ATTENDANCES_UPDATE: "attendances.update",
+    ATTENDANCES_DELETE: "attendances.delete"
 };
