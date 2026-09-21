@@ -34,6 +34,10 @@ const teacherRoutes = require("./routes/teacher")
 const studentRoutes = require("./routes/student")
 const guardianRoutes = require("./routes/guardian")
 const studentGuardianRoutes = require("./routes/studentguardian")
+const subjectRoutes = require("./routes/subject")
+const classRoutes = require("./routes/class")
+const enrollmentRoutes = require("./routes/enrollment")
+const teacherAssignmentRoutes = require("./routes/teacherassignment")
 
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/schools', schoolRoutes)
@@ -43,6 +47,10 @@ app.use('/api/v1/teachers', teacherRoutes)
 app.use('/api/v1/students', studentRoutes)
 app.use('/api/v1/guardians', guardianRoutes)
 app.use('/api/v1/student-guardians', studentGuardianRoutes)
+app.use('/api/v1/subjects', subjectRoutes)
+app.use('/api/v1/classes', classRoutes)
+app.use('/api/v1/enrollments', enrollmentRoutes)
+app.use('/api/v1/teacher-assignments', teacherAssignmentRoutes)
 
 
 

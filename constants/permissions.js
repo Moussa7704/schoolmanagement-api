@@ -43,5 +43,24 @@ module.exports = {
 
     STUDENT_GUARDIANS_VIEW: "student_guardians.view",
     STUDENT_GUARDIANS_CREATE: "student_guardians.create",
-    STUDENT_GUARDIANS_DELETE: "student_guardians.delete"
+    STUDENT_GUARDIANS_DELETE: "student_guardians.delete",
+
+    SUBJECTS_VIEW: "subjects.view",
+    SUBJECTS_CREATE: "subjects.create",
+    SUBJECTS_UPDATE: "subjects.update",
+    SUBJECTS_DELETE: "subjects.delete",
+
+    CLASSES_VIEW: "classes.view",
+    CLASSES_CREATE: "classes.create",
+    CLASSES_UPDATE: "classes.update",
+    CLASSES_DELETE: "classes.delete",
+
+    ENROLLMENTS_VIEW: "enrollments.view",
+    ENROLLMENTS_CREATE: "enrollments.create",
+    ENROLLMENTS_UPDATE: "enrollments.update",
+    ENROLLMENTS_DELETE: "enrollments.delete",
+
+    TEACHER_ASSIGNMENTS_VIEW: "teacher_assignments.view",
+    TEACHER_ASSIGNMENTS_CREATE: "teacher_assignments.create",
+    TEACHER_ASSIGNMENTS_DELETE: "teacher_assignments.delete"
 };
