@@ -10,30 +10,30 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      User.belongsTo(models.Compagny, {
-        foreignKey: "compagny_id",
-        as: "Compagny"
-      })
-      User.hasMany(models.Otp, {
-        foreignKey: "user_id",
-        as: "otps"
-      });
-      User.belongsTo(models.Role, {
-        foreignKey: "role_id",
-        as: "Role"
-      });
-      User.belongsTo(models.Agency, {
-        foreignKey: "agency_id",
-        as: "Agency"
-      });
-      User.hasMany(models.Trip, {
-        foreignKey: "driver_id",
-        as: "DriverTrips"
-      });
-      User.hasMany(models.Booking, {
-        foreignKey: "created_by",
-        as: "bookings"
-      });
+      // User.belongsTo(models.Compagny, {
+      //   foreignKey: "compagny_id",
+      //   as: "Compagny"
+      // })
+      // User.hasMany(models.Otp, {
+      //   foreignKey: "user_id",
+      //   as: "otps"
+      // });
+      // User.belongsTo(models.Role, {
+      //   foreignKey: "role_id",
+      //   as: "Role"
+      // });
+      // User.belongsTo(models.Agency, {
+      //   foreignKey: "agency_id",
+      //   as: "Agency"
+      // });
+      // User.hasMany(models.Trip, {
+      //   foreignKey: "driver_id",
+      //   as: "DriverTrips"
+      // });
+      // User.hasMany(models.Booking, {
+      //   foreignKey: "created_by",
+      //   as: "bookings"
+      // });
     }
   }
   User.init({
