@@ -22,6 +22,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "academic_year_id",
         as: "Classes"
       });
+      AcademicYear.hasMany(models.TuitionFee, {
+        foreignKey: "academic_year_id",
+        as: "TuitionFees"
+      });
     }
   }
   AcademicYear.init({

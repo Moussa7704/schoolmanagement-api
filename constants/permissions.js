@@ -82,5 +82,14 @@ module.exports = {
     ATTENDANCES_VIEW: "attendances.view",
     ATTENDANCES_CREATE: "attendances.create",
     ATTENDANCES_UPDATE: "attendances.update",
-    ATTENDANCES_DELETE: "attendances.delete"
+    ATTENDANCES_DELETE: "attendances.delete",
+
+    TUITION_FEES_VIEW: "tuition_fees.view",
+    TUITION_FEES_CREATE: "tuition_fees.create",
+    TUITION_FEES_UPDATE: "tuition_fees.update",
+    TUITION_FEES_DELETE: "tuition_fees.delete",
+
+    PAYMENTS_VIEW: "payments.view",
+    PAYMENTS_CREATE: "payments.create",
+    PAYMENTS_DELETE: "payments.delete"
 };

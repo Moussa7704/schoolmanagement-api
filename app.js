@@ -43,6 +43,8 @@ const assessmentRoutes = require("./routes/assessment")
 const gradeRoutes = require("./routes/grade")
 const reportCardRoutes = require("./routes/reportcard")
 const attendanceRoutes = require("./routes/attendance")
+const tuitionFeeRoutes = require("./routes/tuitionfee")
+const paymentRoutes = require("./routes/payment")
 
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/schools', schoolRoutes)
@@ -60,6 +62,8 @@ app.use('/api/v1/assessments', assessmentRoutes)
 app.use('/api/v1/grades', gradeRoutes)
 app.use('/api/v1/report-cards', reportCardRoutes)
 app.use('/api/v1/attendances', attendanceRoutes)
+app.use('/api/v1/tuition-fees', tuitionFeeRoutes)
+app.use('/api/v1/payments', paymentRoutes)
 
 
 
