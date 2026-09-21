@@ -10,8 +10,7 @@
  *       Retourne les rôles accessibles en fonction du rôle de l'utilisateur connecté :
  *
  *       - SUPER_ADMIN → tous les rôles
- *       - COMPAGNY_ADMIN → AGENCY_ADMIN, AGENT, CONTROLLER, DRIVER
- *       - AGENCY_ADMIN → AGENT, CONTROLLER, DRIVER
+ *       - SCHOOL_ADMIN → DIRECTOR, ACCOUNTANT, TEACHER, STUDENT, PARENT, STAFF
  *
  *     responses:
  *       200:
@@ -37,7 +36,7 @@
  *                         example: 1
  *                       name:
  *                         type: string
- *                         example: DRIVER
+ *                         example: TEACHER
  *                       createdAt:
  *                         type: string
  *                         example: 2026-01-01T10:00:00.000Z

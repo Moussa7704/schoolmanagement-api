@@ -1,5 +1,6 @@
 const { verifyAccessToken } = require("../utils/jwt")
-const { User } = require("../models")
+const { User, Role, Permission } = require("../models")
+const roles = require("../constants/roles")
 
 const authenticate = async (req, res, next) => {
     try {
@@ -14,17 +15,24 @@ const authenticate = async (req, res, next) => {
         const decoded = verifyAccessToken(token)
 
         const user = await User.findByPk(decoded.id, {
-            include: ['Role'],
+            include: [{
+                model: Role,
+                as: 'Role',
+                include: [{
+                    model: Permission,
+                    as: 'Permissions'
+                }]
+            }],
             attributes: {
                 exclude: ['password']
             }
         })
-        if (!user || !user.is_active) {
+        if (!user || user.status !== 'active') {
             return res.status(401).json({
                 message: "Utilisateur introuvable ou inactif"
             })
         }
-        req.user = decoded;
+        req.user = user;
         next()
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
@@ -39,10 +47,17 @@ const authenticate = async (req, res, next) => {
     }
 }
 
-const authorize = (...roles) => {
+const authorize = (...permissionNames) => {
     return (req, res, next) => {
 
-        if (!roles.includes(req.user.role)) {
+        if (req.user?.Role?.name === roles.SUPER_ADMIN) {
+            return next()
+        }
+
+        const userPermissions = req.user?.Role?.Permissions?.map(p => p.name) || [];
+        const hasPermission = permissionNames.some(p => userPermissions.includes(p));
+
+        if (!hasPermission) {
             return res.status(403).json({
                 message: "Accès refusé"
             })

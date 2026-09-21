@@ -90,8 +90,7 @@ const verifyOtp = async (req, res) => {
         const data = {
             id: user.id,
             role: user.Role?.name,
-            compagny_id: user.compagny_id,
-            agency_id: user.agency_id
+            school_id: user.school_id
         };
         const accessToken = generateAccessToken(data)
         const refreshToken = generateRefreshToken(data)
@@ -146,7 +145,7 @@ const refresh = async (req, res) => {
             include: ['Role']
         });
 
-        if (!user || !user.is_active) {
+        if (!user || user.status !== 'active') {
             res.clearCookie("refreshToken", refreshCookieOptions);
             return res.status(403).json({ message: "Utilisateur introuvable ou inactif" });
         }
@@ -154,8 +153,7 @@ const refresh = async (req, res) => {
         const data = {
             id: user.id,
             role: user.Role?.name,
-            compagny_id: user.compagny_id,
-            agency_id: user.agency_id
+            school_id: user.school_id
         };
 
         const newAccessToken = generateAccessToken(data);
@@ -197,7 +195,7 @@ const me = async (req, res) => {
     try {
 
         const user = await User.findByPk(req.user.id, {
-            include: ["Role", "Agency", "Compagny"],
+            include: ["Role"],
             attributes: {
                 exclude: ["password"]
             }
@@ -265,7 +263,7 @@ const updateMe = async (req, res) => {
         });
 
         const updated = await User.findByPk(user.id, {
-            include: ["Role", "Agency", "Compagny"],
+            include: ["Role"],
             attributes: {
                 exclude: ["password"]
             }

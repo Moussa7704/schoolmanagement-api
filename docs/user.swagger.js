@@ -26,11 +26,10 @@
  *               - password
  *               - role_id
  *             properties:
- *               compagny_id:
+ *               school_id:
  *                 type: integer
- *                 example: 1
- *               agency_id:
- *                 type: integer
+ *                 nullable: true
+ *                 description: Nul uniquement pour un utilisateur SUPER_ADMIN
  *                 example: 1
  *               role_id:
  *                 type: integer
@@ -50,9 +49,10 @@
  *               password:
  *                 type: string
  *                 example: Password123@
- *               is_active:
- *                 type: boolean
- *                 example: true
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive, suspended, pending]
+ *                 example: active
  *     responses:
  *       201:
  *         description: Utilisateur créé
@@ -86,17 +86,14 @@
  *         schema:
  *           type: integer
  *       - in: query
- *         name: agency_id
+ *         name: school_id
  *         schema:
  *           type: integer
  *       - in: query
- *         name: compagny_id
+ *         name: status
  *         schema:
- *           type: integer
- *       - in: query
- *         name: is_active
- *         schema:
- *           type: boolean
+ *           type: string
+ *           enum: [active, inactive, suspended, pending]
  *     responses:
  *       200:
  *         description: Liste des utilisateurs
@@ -175,7 +172,7 @@
  * @swagger
  * /users/{id}/status:
  *   patch:
- *     summary: Activer ou désactiver un utilisateur
+ *     summary: Changer le statut d'un utilisateur
  *     tags: [Utilisateurs]
  *     security:
  *       - bearerAuth: []
@@ -192,10 +189,11 @@
  *           schema:
  *             type: object
  *             required:
- *               - is_active
+ *               - status
  *             properties:
- *               is_active:
- *                 type: boolean
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive, suspended, pending]
  *     responses:
  *       200:
  *         description: Statut modifié
@@ -206,7 +204,7 @@
  * /users/{id}/change-password:
  *   put:
  *     summary: Réinitialiser le mot de passe d'un utilisateur
- *     description: Accessible uniquement au SUPER_ADMIN et COMPAGNY_ADMIN.
+ *     description: Accessible uniquement au SUPER_ADMIN et SCHOOL_ADMIN.
  *     tags: [Utilisateurs]
  *     security:
  *       - bearerAuth: []
