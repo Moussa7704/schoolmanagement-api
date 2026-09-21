@@ -27,10 +27,14 @@ app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec,
 ));
 
 const authRoutes = require("./routes/auth")
-
-
+const schoolRoutes = require("./routes/school")
+const academicYearRoutes = require("./routes/academicyear")
+const periodRoutes = require("./routes/period")
 
 app.use('/api/v1/auth', authRoutes)
+app.use('/api/v1/schools', schoolRoutes)
+app.use('/api/v1/academic-years', academicYearRoutes)
+app.use('/api/v1/periods', periodRoutes)
 
 
 
