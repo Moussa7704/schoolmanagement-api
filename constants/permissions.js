@@ -22,5 +22,26 @@ module.exports = {
     PERIODS_VIEW: "periods.view",
     PERIODS_CREATE: "periods.create",
     PERIODS_UPDATE: "periods.update",
-    PERIODS_DELETE: "periods.delete"
+    PERIODS_DELETE: "periods.delete",
+
+    TEACHERS_VIEW: "teachers.view",
+    TEACHERS_CREATE: "teachers.create",
+    TEACHERS_UPDATE: "teachers.update",
+    TEACHERS_DELETE: "teachers.delete",
+
+    STUDENTS_VIEW: "students.view",
+    STUDENTS_CREATE: "students.create",
+    STUDENTS_UPDATE: "students.update",
+    STUDENTS_DELETE: "students.delete",
+    STUDENTS_GRANT_ACCESS: "students.grant_access",
+
+    GUARDIANS_VIEW: "guardians.view",
+    GUARDIANS_CREATE: "guardians.create",
+    GUARDIANS_UPDATE: "guardians.update",
+    GUARDIANS_DELETE: "guardians.delete",
+    GUARDIANS_GRANT_ACCESS: "guardians.grant_access",
+
+    STUDENT_GUARDIANS_VIEW: "student_guardians.view",
+    STUDENT_GUARDIANS_CREATE: "student_guardians.create",
+    STUDENT_GUARDIANS_DELETE: "student_guardians.delete"
 };

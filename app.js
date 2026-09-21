@@ -30,11 +30,19 @@ const authRoutes = require("./routes/auth")
 const schoolRoutes = require("./routes/school")
 const academicYearRoutes = require("./routes/academicyear")
 const periodRoutes = require("./routes/period")
+const teacherRoutes = require("./routes/teacher")
+const studentRoutes = require("./routes/student")
+const guardianRoutes = require("./routes/guardian")
+const studentGuardianRoutes = require("./routes/studentguardian")
 
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/schools', schoolRoutes)
 app.use('/api/v1/academic-years', academicYearRoutes)
 app.use('/api/v1/periods', periodRoutes)
+app.use('/api/v1/teachers', teacherRoutes)
+app.use('/api/v1/students', studentRoutes)
+app.use('/api/v1/guardians', guardianRoutes)
+app.use('/api/v1/student-guardians', studentGuardianRoutes)
 
 
 

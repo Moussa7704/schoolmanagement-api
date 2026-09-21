@@ -1,0 +1,25 @@
+const express = require("express")
+const router = express.Router()
+const permissions = require("../constants/permissions")
+const studentGuardianController = require("../controllers/studentguardian.controller")
+const { authenticate, authorize } = require("../middlewares/auth")
+
+router.post('/',
+    authenticate,
+    authorize(permissions.STUDENT_GUARDIANS_CREATE),
+    studentGuardianController.attachGuardian
+)
+
+router.get('/',
+    authenticate,
+    authorize(permissions.STUDENT_GUARDIANS_VIEW),
+    studentGuardianController.listStudentGuardians
+)
+
+router.delete('/:id',
+    authenticate,
+    authorize(permissions.STUDENT_GUARDIANS_DELETE),
+    studentGuardianController.detachGuardian
+)
+
+module.exports = router
