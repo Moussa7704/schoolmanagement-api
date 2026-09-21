@@ -4,13 +4,13 @@ const options = {
     definition: {
         openapi: "3.0.0",
         info: {
-            title: "Gestion des transport Bus",
+            title: "School Management API",
             version: "1.0.0",
-            description: `BusFlow est une plateforme SaaS de gestion de transport interurbain permettant aux compagnies de transport de gérer`,
+            description: `API de gestion scolaire permettant l'authentification des utilisateurs, la gestion des comptes et des rôles au sein d'un établissement.`,
         },
         servers: [
             {
-                url: "http://localhost:8080/api/v1",
+                url: "http://localhost:9090/api/v1",
             },
         ],
         components: {

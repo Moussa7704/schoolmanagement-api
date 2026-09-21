@@ -17,7 +17,7 @@ app.use(express.urlencoded({ extended: true }))
 
 app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec,
     {
-        customSiteTitle: `Gestion Bus`,
+        customSiteTitle: `School Management API`,
         customCss: `
         .swagger-ui .topbar {
             display: none;
