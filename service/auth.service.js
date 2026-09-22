@@ -1,4 +1,4 @@
-const { User, Otp, RefreshToken, PasswordReset } = require("../models")
+const { User, Otp, RefreshToken, PasswordReset, Role, Permission } = require("../models")
 const bcrypt = require("bcrypt")
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -149,7 +149,10 @@ class AuthService extends BaseService {
 
     async getMe(userId) {
         const user = await this.model.findByPk(userId, {
-            include: ["Role"],
+            include: [{
+                model: Role, as: 'Role',
+                include: [{ model: Permission, as: 'Permissions' }]
+            }],
             attributes: { exclude: ["password"] }
         });
 
