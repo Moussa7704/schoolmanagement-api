@@ -28,6 +28,8 @@ app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec,
 
 // Routes
 const authRoutes = require("./routes/auth")
+const userRoutes = require("./routes/user")
+const roleRoutes = require("./routes/roles")
 const schoolRoutes = require("./routes/school")
 const academicYearRoutes = require("./routes/academicyear")
 const periodRoutes = require("./routes/period")
@@ -47,6 +49,8 @@ const tuitionFeeRoutes = require("./routes/tuitionfee")
 const paymentRoutes = require("./routes/payment")
 
 app.use('/api/v1/auth', authRoutes)
+app.use('/api/v1/users', userRoutes)
+app.use('/api/v1/roles', roleRoutes)
 app.use('/api/v1/schools', schoolRoutes)
 app.use('/api/v1/academic-years', academicYearRoutes)
 app.use('/api/v1/periods', periodRoutes)

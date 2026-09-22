@@ -1,20 +1,22 @@
 const express = require("express");
 const router = express.Router();
 
+const permissions = require("../constants/permissions");
 const roleController = require("../controllers/role.controller");
-const { authenticate } = require("../middlewares/auth");
-const { authorize } = require("../middlewares/auth");
-const roles = require("../constants/roles");
+const { authenticate, authorize } = require("../middlewares/auth");
 
 router.get(
     "/",
     authenticate,
-    authorize(
-        roles.SUPER_ADMIN,
-        roles.COMPAGNY_ADMIN,
-        roles.AGENCY_ADMIN
-    ),
+    authorize(permissions.ROLES_VIEW),
     roleController.listRoles
+);
+
+router.get(
+    "/:id",
+    authenticate,
+    authorize(permissions.ROLES_VIEW),
+    roleController.getRoleById
 );
 
 module.exports = router;

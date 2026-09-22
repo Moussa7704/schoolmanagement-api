@@ -2,7 +2,7 @@
  * @swagger
  * tags:
  *   name: Utilisateurs
- *   description: Gestion des utilisateurs
+ *   description: Comptes de connexion "directs" sans fiche métier dédiée (SCHOOL_ADMIN, DIRECTOR, ACCOUNTANT, STAFF). Les enseignants passent par /teachers, les élèves/parents par grant-access.
  */
 
 /**
@@ -10,6 +10,7 @@
  * /users:
  *   post:
  *     summary: Créer un utilisateur
+ *     description: Rôles autorisés uniquement -- SCHOOL_ADMIN, DIRECTOR, ACCOUNTANT, STAFF. TEACHER doit passer par /teachers, STUDENT/PARENT par grant-access, SUPER_ADMIN n'est jamais créé via cette route.
  *     tags: [Utilisateurs]
  *     security:
  *       - bearerAuth: []
@@ -24,40 +25,33 @@
  *               - last_name
  *               - email
  *               - password
- *               - role_id
+ *               - role
  *             properties:
  *               school_id:
  *                 type: integer
- *                 nullable: true
- *                 description: Nul uniquement pour un utilisateur SUPER_ADMIN
- *                 example: 1
- *               role_id:
- *                 type: integer
- *                 example: 2
+ *                 description: Ignoré si l'appelant n'est pas SUPER_ADMIN (utilise alors son école)
  *               first_name:
  *                 type: string
- *                 example: Moussa
  *               last_name:
  *                 type: string
- *                 example: Coulibaly
- *               phone:
- *                 type: string
- *                 example: "77000000"
  *               email:
  *                 type: string
- *                 example: moussa@email.com
  *               password:
  *                 type: string
- *                 example: Password123@
- *               status:
+ *               phone:
  *                 type: string
- *                 enum: [active, inactive, suspended, pending]
- *                 example: active
+ *               role:
+ *                 type: string
+ *                 enum: [SCHOOL_ADMIN, DIRECTOR, ACCOUNTANT, STAFF]
  *     responses:
  *       201:
  *         description: Utilisateur créé
  *       400:
- *         description: Données invalides
+ *         description: Champs manquants, rôle non géré par cette route ou email déjà utilisé
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: École ou rôle introuvable
  */
 
 /**
@@ -68,32 +62,6 @@
  *     tags: [Utilisateurs]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *       - in: query
- *         name: role_id
- *         schema:
- *           type: integer
- *       - in: query
- *         name: school_id
- *         schema:
- *           type: integer
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, inactive, suspended, pending]
  *     responses:
  *       200:
  *         description: Liste des utilisateurs
@@ -116,6 +84,8 @@
  *     responses:
  *       200:
  *         description: Utilisateur trouvé
+ *       403:
+ *         description: Accès refusé
  *       404:
  *         description: Utilisateur introuvable
  */
@@ -124,7 +94,8 @@
  * @swagger
  * /users/{id}:
  *   put:
- *     summary: Modifier un utilisateur
+ *     summary: Modifier un utilisateur (nom, téléphone, email)
+ *     description: Refusé si ce compte est lié à une fiche enseignant/élève/tuteur -- passez alors par /teachers, /students ou /guardians.
  *     tags: [Utilisateurs]
  *     security:
  *       - bearerAuth: []
@@ -143,6 +114,10 @@
  *     responses:
  *       200:
  *         description: Utilisateur modifié
+ *       400:
+ *         description: Compte lié à une fiche métier ou email déjà utilisé
+ *       403:
+ *         description: Accès refusé
  *       404:
  *         description: Utilisateur introuvable
  */
@@ -152,6 +127,7 @@
  * /users/{id}:
  *   delete:
  *     summary: Supprimer un utilisateur
+ *     description: Refusé pour un compte SUPER_ADMIN ou lié à une fiche enseignant/élève/tuteur.
  *     tags: [Utilisateurs]
  *     security:
  *       - bearerAuth: []
@@ -164,6 +140,10 @@
  *     responses:
  *       200:
  *         description: Utilisateur supprimé
+ *       400:
+ *         description: Suppression refusée
+ *       403:
+ *         description: Accès refusé
  *       404:
  *         description: Utilisateur introuvable
  */
@@ -197,14 +177,19 @@
  *     responses:
  *       200:
  *         description: Statut modifié
+ *       400:
+ *         description: Statut invalide
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Utilisateur introuvable
  */
 
 /**
  * @swagger
  * /users/{id}/change-password:
  *   put:
- *     summary: Réinitialiser le mot de passe d'un utilisateur
- *     description: Accessible uniquement au SUPER_ADMIN et SCHOOL_ADMIN.
+ *     summary: Réinitialiser le mot de passe d'un utilisateur (par un administrateur)
  *     tags: [Utilisateurs]
  *     security:
  *       - bearerAuth: []
@@ -225,10 +210,11 @@
  *             properties:
  *               new_password:
  *                 type: string
- *                 example: NewPassword123@
  *     responses:
  *       200:
  *         description: Mot de passe modifié
+ *       400:
+ *         description: Mot de passe trop court
  *       403:
  *         description: Accès refusé
  *       404:

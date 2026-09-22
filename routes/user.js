@@ -1,49 +1,49 @@
 const express = require("express")
 const router = express.Router()
-const roles = require('../constants/roles')
+const permissions = require("../constants/permissions")
 const userController = require("../controllers/user.controller")
 const { authenticate, authorize } = require("../middlewares/auth")
 
-// Gestion des utilisateurs
 router.post('/',
     authenticate,
-    authorize(roles.SUPER_ADMIN, roles.COMPAGNY_ADMIN, roles.AGENCY_ADMIN),
+    authorize(permissions.USERS_CREATE),
     userController.createUser
 )
+
 router.get('/',
     authenticate,
-    authorize(roles.SUPER_ADMIN, roles.COMPAGNY_ADMIN, roles.AGENCY_ADMIN),
+    authorize(permissions.USERS_VIEW),
     userController.listUsers
 )
 
 router.get('/:id',
     authenticate,
-    authorize(roles.SUPER_ADMIN, roles.COMPAGNY_ADMIN, roles.AGENCY_ADMIN),
+    authorize(permissions.USERS_VIEW),
     userController.getUserById
 )
 
-router.put("/:id",
+router.put('/:id',
     authenticate,
-    authorize(roles.SUPER_ADMIN, roles.COMPAGNY_ADMIN, roles.AGENCY_ADMIN),
+    authorize(permissions.USERS_UPDATE),
     userController.updateUser
-);
+)
 
-router.delete("/:id",
+router.delete('/:id',
     authenticate,
-    authorize(roles.SUPER_ADMIN, roles.COMPAGNY_ADMIN, roles.AGENCY_ADMIN),
+    authorize(permissions.USERS_DELETE),
     userController.deleteUser
-);
+)
 
-router.patch("/:id/status",
+router.patch('/:id/status',
     authenticate,
-    authorize(roles.SUPER_ADMIN, roles.COMPAGNY_ADMIN, roles.AGENCY_ADMIN),
+    authorize(permissions.USERS_CHANGE_STATUS),
     userController.changeUserStatus
-);
+)
 
-router.put("/:id/change-password",
+router.put('/:id/change-password',
     authenticate,
-    authorize(roles.SUPER_ADMIN, roles.COMPAGNY_ADMIN),
+    authorize(permissions.USERS_CHANGE_PASSWORD),
     userController.changePassword
-);
+)
 
 module.exports = router

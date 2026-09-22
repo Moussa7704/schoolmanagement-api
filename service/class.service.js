@@ -1,9 +1,22 @@
-const { Class, AcademicYear } = require("../models")
+const { Class, AcademicYear, Enrollment, Student } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
 
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
+
+// Student.gender est un champ libre (pas d'enum en base) : on normalise pour
+// accepter aussi bien "M"/"F" que "Homme"/"Femme" saisis dans /students.
+const BOY_VALUES = new Set(['M', 'H', 'MALE', 'HOMME', 'GARCON']);
+const GIRL_VALUES = new Set(['F', 'FEMALE', 'FEMME', 'FILLE']);
+const normalizeGender = (value) => {
+    if (!value) return null;
+    const normalized = value.toString().trim().toUpperCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, ''); // enlève les accents
+    if (BOY_VALUES.has(normalized)) return 'M';
+    if (GIRL_VALUES.has(normalized)) return 'F';
+    return null;
+};
 
 class ClassService extends BaseService {
     constructor() {
@@ -22,6 +35,28 @@ class ClassService extends BaseService {
         }
 
         return academicYear;
+    }
+
+    async _genderCounts(classId) {
+        const enrollments = await Enrollment.findAll({
+            where: { class_id: classId, status: 'ACTIVE' },
+            include: [{ model: Student, attributes: ["gender"] }]
+        });
+
+        let boys_count = 0;
+        let girls_count = 0;
+        for (const enrollment of enrollments) {
+            const gender = normalizeGender(enrollment.Student?.gender);
+            if (gender === 'M') boys_count++;
+            else if (gender === 'F') girls_count++;
+        }
+
+        return { students_count: enrollments.length, boys_count, girls_count };
+    }
+
+    async _enrich(classRecord) {
+        const counts = await this._genderCounts(classRecord.id);
+        return { ...classRecord.toJSON(), ...counts };
     }
 
     async create(data, currentUser) {
@@ -50,10 +85,12 @@ class ClassService extends BaseService {
             where.academic_year_id = academicYears.map((a) => a.id);
         }
 
-        return this.model.findAll({
+        const classes = await this.model.findAll({
             where,
             order: [["name", "ASC"]]
         });
+
+        return Promise.all(classes.map((c) => this._enrich(c)));
     }
 
     async _findWithAccess(id, currentUser) {
@@ -69,7 +106,8 @@ class ClassService extends BaseService {
     }
 
     async getById(id, currentUser) {
-        return this._findWithAccess(id, currentUser);
+        const classRecord = await this._findWithAccess(id, currentUser);
+        return this._enrich(classRecord);
     }
 
     async update(id, data, currentUser) {

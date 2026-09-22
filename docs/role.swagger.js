@@ -1,74 +1,40 @@
 /**
  * @swagger
+ * tags:
+ *   name: Rôles
+ *   description: Rôles et permissions associées (lecture seule)
+ */
+
+/**
+ * @swagger
  * /roles:
  *   get:
- *     summary: Récupérer la liste des rôles disponibles selon le niveau d'accès de l'utilisateur
- *     tags: [Roles]
+ *     summary: Liste des rôles avec leurs permissions
+ *     tags: [Rôles]
  *     security:
  *       - bearerAuth: []
- *     description: |
- *       Retourne les rôles accessibles en fonction du rôle de l'utilisateur connecté :
- *
- *       - SUPER_ADMIN → tous les rôles
- *       - SCHOOL_ADMIN → DIRECTOR, ACCOUNTANT, TEACHER, STUDENT, PARENT, STAFF
- *
  *     responses:
  *       200:
- *         description: Liste des rôles récupérés avec succès
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Liste des rôles récupérés avec succès
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         example: 1
- *                       name:
- *                         type: string
- *                         example: TEACHER
- *                       createdAt:
- *                         type: string
- *                         example: 2026-01-01T10:00:00.000Z
- *                       updatedAt:
- *                         type: string
- *                         example: 2026-01-01T10:00:00.000Z
- *
- *       403:
- *         description: Accès refusé
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Accès refusé
- *
- *       500:
- *         description: Erreur serveur
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Internal server error
+ *         description: Liste des rôles
+ */
+
+/**
+ * @swagger
+ * /roles/{id}:
+ *   get:
+ *     summary: Détail d'un rôle avec ses permissions
+ *     tags: [Rôles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Rôle trouvé
+ *       404:
+ *         description: Rôle introuvable
  */

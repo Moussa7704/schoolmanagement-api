@@ -49,7 +49,7 @@
  * @swagger
  * /classes:
  *   get:
- *     summary: Liste des classes
+ *     summary: Liste des classes (avec effectifs calculés)
  *     tags: [Classes]
  *     security:
  *       - bearerAuth: []
@@ -60,14 +60,14 @@
  *           type: integer
  *     responses:
  *       200:
- *         description: Liste des classes
+ *         description: Liste des classes, chacune enrichie de students_count, boys_count et girls_count (calculés depuis les inscriptions actives)
  */
 
 /**
  * @swagger
  * /classes/{id}:
  *   get:
- *     summary: Détail d'une classe
+ *     summary: Détail d'une classe (effectifs calculés à la volée)
  *     tags: [Classes]
  *     security:
  *       - bearerAuth: []
@@ -79,7 +79,7 @@
  *           type: integer
  *     responses:
  *       200:
- *         description: Classe trouvée
+ *         description: Classe trouvée, avec students_count, boys_count et girls_count
  *       403:
  *         description: Accès refusé
  *       404:
