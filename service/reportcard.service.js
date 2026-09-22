@@ -26,6 +26,15 @@ class ReportCardService extends BaseService {
         return academicYear.school_id;
     }
 
+    async _assertClassAccess(classId, currentUser) {
+        const classRecord = await Class.findByPk(classId);
+        if (!classRecord) {
+            throw new HttpError("Classe introuvable", 404);
+        }
+        const academicYear = await AcademicYear.findByPk(classRecord.academic_year_id);
+        await this._assertSchoolAccess(academicYear.school_id, currentUser);
+    }
+
     async create(data, currentUser) {
         const { student_id, period_id } = data;
 
@@ -76,6 +85,7 @@ class ReportCardService extends BaseService {
             }
         } else if (query.class_id) {
             where.class_id = query.class_id;
+            await this._assertClassAccess(query.class_id, currentUser);
         } else if (!isSuperAdmin(currentUser)) {
             const academicYears = await AcademicYear.findAll({
                 where: { school_id: currentUser.school_id },
@@ -86,6 +96,13 @@ class ReportCardService extends BaseService {
                 attributes: ["id"]
             });
             where.class_id = classes.map((c) => c.id);
+        }
+
+        // Filtre indépendant, combinable avec le scoping ci-dessus (ex: classe X
+        // pour l'école courante ET période Y) — jamais utilisé seul pour le scoping
+        // multi-tenant, qui reste porté par student_id/class_id.
+        if (query.period_id) {
+            where.period_id = query.period_id;
         }
 
         return this.model.findAll({
@@ -133,7 +150,13 @@ class ReportCardService extends BaseService {
             const weight = assessment.coefficient;
 
             if (!bySubject.has(subject.id)) {
-                bySubject.set(subject.id, { subject_id: subject.id, subject_name: subject.name, weightedSum: 0, weightTotal: 0 });
+                bySubject.set(subject.id, {
+                    subject_id: subject.id,
+                    subject_name: subject.name,
+                    coefficient: subject.coefficient_default,
+                    weightedSum: 0,
+                    weightTotal: 0
+                });
             }
             const entry = bySubject.get(subject.id);
             entry.weightedSum += normalized * weight;
@@ -143,12 +166,18 @@ class ReportCardService extends BaseService {
         const subjects = Array.from(bySubject.values()).map((s) => ({
             subject_id: s.subject_id,
             subject_name: s.subject_name,
+            coefficient: s.coefficient,
             average: s.weightTotal ? Number((s.weightedSum / s.weightTotal).toFixed(2)) : null
         }));
 
-        const validAverages = subjects.map((s) => s.average).filter((a) => a !== null);
-        const overall_average = validAverages.length
-            ? Number((validAverages.reduce((sum, a) => sum + a, 0) / validAverages.length).toFixed(2))
+        // Moyenne générale pondérée par le coefficient de chaque matière (pas une
+        // simple moyenne des moyennes) — c'est tout l'intérêt d'avoir un coefficient.
+        const gradedSubjects = subjects.filter((s) => s.average !== null);
+        const overallWeightTotal = gradedSubjects.reduce((sum, s) => sum + s.coefficient, 0);
+        const overall_average = overallWeightTotal
+            ? Number(
+                (gradedSubjects.reduce((sum, s) => sum + s.average * s.coefficient, 0) / overallWeightTotal).toFixed(2)
+            )
             : null;
 
         return {
