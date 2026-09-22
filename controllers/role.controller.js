@@ -37,7 +37,26 @@ const getRoleById = async (req, res) => {
     }
 };
 
+const updateRolePermissions = async (req, res) => {
+    try {
+        const role = await roleService.updatePermissions(req.params.id, req.body.permission_ids, req.user);
+
+        return sendResponse(res, {
+            message: "Permissions du rôle mises à jour avec succès",
+            data: role
+        });
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 400
+        });
+    }
+};
+
 module.exports = {
     listRoles,
-    getRoleById
+    getRoleById,
+    updateRolePermissions
 }

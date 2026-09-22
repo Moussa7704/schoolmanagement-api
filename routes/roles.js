@@ -19,4 +19,11 @@ router.get(
     roleController.getRoleById
 );
 
+router.put(
+    "/:id/permissions",
+    authenticate,
+    authorize(permissions.PERMISSIONS_MANAGE),
+    roleController.updateRolePermissions
+);
+
 module.exports = router;
