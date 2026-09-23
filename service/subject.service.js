@@ -1,4 +1,4 @@
-const { Subject, School } = require("../models")
+const { Subject, School, TeacherAssignment } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
@@ -85,6 +85,19 @@ class SubjectService extends BaseService {
 
     async delete(id, currentUser) {
         const subject = await this._findWithAccess(id, currentUser);
+
+        // La contrainte DB bloque déjà la suppression (ON DELETE RESTRICT) pour
+        // éviter d'effacer en cascade les affectations/évaluations/notes liées à
+        // cette matière ; ce contrôle applicatif sert juste à renvoyer un message
+        // clair plutôt qu'une erreur SQL brute.
+        const assignmentCount = await TeacherAssignment.count({ where: { subject_id: subject.id } });
+        if (assignmentCount > 0) {
+            throw new HttpError(
+                "Impossible de supprimer cette matière : elle est encore affectée à au moins une classe/enseignant. Retirez d'abord ces affectations.",
+                400
+            );
+        }
+
         await subject.destroy();
     }
 }
