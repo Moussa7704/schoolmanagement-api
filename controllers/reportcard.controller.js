@@ -56,6 +56,24 @@ const getReportCardById = async (req, res) => {
     }
 };
 
+const getClassRanking = async (req, res) => {
+    try {
+        const ranking = await reportCardService.getClassRanking(req.query.class_id, req.query.period_id, req.user);
+
+        return sendResponse(res, {
+            message: "Classement récupéré avec succès",
+            data: ranking
+        });
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 400
+        });
+    }
+};
+
 const validateReportCard = async (req, res) => {
     try {
         const reportCard = await reportCardService.validate(req.params.id, req.user);
@@ -95,6 +113,7 @@ module.exports = {
     createReportCard,
     listReportCards,
     getReportCardById,
+    getClassRanking,
     validateReportCard,
     deleteReportCard
 }

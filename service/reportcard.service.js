@@ -32,6 +32,18 @@ class ReportCardService extends BaseService {
         if (!classRecord) {
             throw new HttpError("Classe introuvable", 404);
         }
+
+        if (isParent(currentUser)) {
+            const childIds = await getChildStudentIds(currentUser);
+            const hasChildInClass = await Enrollment.findOne({
+                where: { class_id: classId, student_id: childIds, status: 'ACTIVE' }
+            });
+            if (!hasChildInClass) {
+                throw new HttpError("Accès refusé", 403);
+            }
+            return;
+        }
+
         const academicYear = await AcademicYear.findByPk(classRecord.academic_year_id);
         await this._assertSchoolAccess(academicYear.school_id, currentUser);
     }
@@ -143,19 +155,17 @@ class ReportCardService extends BaseService {
         return this._findWithAccess(id, currentUser);
     }
 
-    async getById(id, currentUser) {
-        const reportCard = await this._findReadable(id, currentUser);
-
+    async _computeAverages(studentId, classId, periodId) {
         const grades = await Grade.findAll({
-            where: { student_id: reportCard.student_id },
+            where: { student_id: studentId },
             include: [{
                 model: Assessment,
                 as: 'Assessment',
-                where: { period_id: reportCard.period_id },
+                where: { period_id: periodId },
                 include: [{
                     model: TeacherAssignment,
                     as: 'TeacherAssignment',
-                    where: { class_id: reportCard.class_id },
+                    where: { class_id: classId },
                     include: [{ model: Subject, as: 'Subject' }]
                 }]
             }]
@@ -199,10 +209,81 @@ class ReportCardService extends BaseService {
             )
             : null;
 
+        return { subjects, overall_average };
+    }
+
+    async _rankClass(classId, periodId, currentUser) {
+        await this._assertClassAccess(classId, currentUser);
+
+        const enrollments = await Enrollment.findAll({
+            where: { class_id: classId, status: 'ACTIVE' },
+            include: [{ model: Student }]
+        });
+
+        const entries = [];
+        for (const enrollment of enrollments) {
+            const student = enrollment.Student;
+            const { overall_average } = await this._computeAverages(student.id, classId, periodId);
+            entries.push({
+                student_id: student.id,
+                student_name: `${student.first_name} ${student.last_name}`,
+                overall_average,
+                rank: null
+            });
+        }
+
+        // Élèves sans moyenne (pas encore de notes) en fin de liste, non classés.
+        entries.sort((a, b) => {
+            if (a.overall_average === null && b.overall_average === null) return 0;
+            if (a.overall_average === null) return 1;
+            if (b.overall_average === null) return -1;
+            return b.overall_average - a.overall_average;
+        });
+
+        // Classement "1224" : deux moyennes égales partagent le même rang, le
+        // rang suivant saute en conséquence (pas de rang consécutif artificiel).
+        let rank = 0;
+        let previousAverage = null;
+        entries.forEach((entry, index) => {
+            if (entry.overall_average === null) {
+                return;
+            }
+            if (entry.overall_average !== previousAverage) {
+                rank = index + 1;
+                previousAverage = entry.overall_average;
+            }
+            entry.rank = rank;
+        });
+
+        return { class_id: classId, period_id: periodId, total_students: entries.length, ranking: entries };
+    }
+
+    async getClassRanking(classId, periodId, currentUser) {
+        if (!classId || !periodId) {
+            throw new HttpError("class_id et period_id sont requis.", 400);
+        }
+
+        return this._rankClass(Number(classId), Number(periodId), currentUser);
+    }
+
+    async getById(id, currentUser) {
+        const reportCard = await this._findReadable(id, currentUser);
+
+        const { subjects, overall_average } = await this._computeAverages(
+            reportCard.student_id, reportCard.class_id, reportCard.period_id
+        );
+
+        const { ranking, total_students } = await this._rankClass(
+            reportCard.class_id, reportCard.period_id, currentUser
+        );
+        const rankEntry = ranking.find((e) => e.student_id === reportCard.student_id);
+
         return {
             ...reportCard.toJSON(),
             subjects,
-            overall_average
+            overall_average,
+            rank: rankEntry ? rankEntry.rank : null,
+            total_students
         };
     }
 

@@ -1,4 +1,4 @@
-const { Assessment, TeacherAssignment, Period, AcademicYear } = require("../models")
+const { Assessment, TeacherAssignment, Period, AcademicYear, Grade } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
@@ -134,6 +134,18 @@ class AssessmentService extends BaseService {
 
     async delete(id, currentUser) {
         const assessment = await this._findWithAccess(id, currentUser);
+
+        // La contrainte DB bloque déjà la suppression (ON DELETE RESTRICT) pour
+        // ne pas effacer silencieusement les notes déjà saisies ; ce contrôle
+        // applicatif renvoie juste un message clair plutôt qu'une erreur SQL brute.
+        const gradeCount = await Grade.count({ where: { assessment_id: assessment.id } });
+        if (gradeCount > 0) {
+            throw new HttpError(
+                "Impossible de supprimer cette évaluation : des notes ont déjà été saisies dessus. Supprimez d'abord ces notes.",
+                400
+            );
+        }
+
         await assessment.destroy();
     }
 }

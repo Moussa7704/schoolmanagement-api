@@ -16,6 +16,12 @@ router.get('/',
     reportCardController.listReportCards
 )
 
+router.get('/ranking',
+    authenticate,
+    authorize(permissions.REPORT_CARDS_VIEW),
+    reportCardController.getClassRanking
+)
+
 router.get('/:id',
     authenticate,
     authorize(permissions.REPORT_CARDS_VIEW),
