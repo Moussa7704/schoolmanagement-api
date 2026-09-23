@@ -22,7 +22,7 @@ const createGuardian = async (req, res) => {
 
 const listGuardians = async (req, res) => {
     try {
-        const guardians = await guardianService.list();
+        const guardians = await guardianService.list(req.user);
 
         return sendResponse(res, {
             message: "Liste des tuteurs/responsables récupérée avec succès",
@@ -40,7 +40,7 @@ const listGuardians = async (req, res) => {
 
 const getGuardianById = async (req, res) => {
     try {
-        const guardian = await guardianService.getById(req.params.id);
+        const guardian = await guardianService.getById(req.params.id, req.user);
 
         return sendResponse(res, {
             message: "Tuteur/responsable trouvé",
@@ -58,7 +58,7 @@ const getGuardianById = async (req, res) => {
 
 const updateGuardian = async (req, res) => {
     try {
-        const guardian = await guardianService.update(req.params.id, req.body);
+        const guardian = await guardianService.update(req.params.id, req.body, req.user);
 
         return sendResponse(res, {
             message: "Tuteur/responsable mis à jour avec succès",
@@ -76,7 +76,7 @@ const updateGuardian = async (req, res) => {
 
 const deleteGuardian = async (req, res) => {
     try {
-        await guardianService.delete(req.params.id);
+        await guardianService.delete(req.params.id, req.user);
 
         return sendResponse(res, {
             message: "Tuteur/responsable supprimé avec succès"
@@ -93,7 +93,7 @@ const deleteGuardian = async (req, res) => {
 
 const grantAccess = async (req, res) => {
     try {
-        const guardian = await guardianService.grantAccess(req.params.id, req.body);
+        const guardian = await guardianService.grantAccess(req.params.id, req.body, req.user);
 
         return sendResponse(res, {
             message: "Compte de connexion créé pour le tuteur/responsable",
