@@ -131,6 +131,18 @@ class TuitionFeeService extends BaseService {
 
     async delete(id, currentUser) {
         const tuitionFee = await this._findWithAccess(id, currentUser);
+
+        // La contrainte DB bloque déjà la suppression (ON DELETE RESTRICT) pour
+        // ne pas effacer silencieusement l'historique des paiements déjà reçus ;
+        // ce contrôle applicatif renvoie juste un message clair.
+        const paymentCount = await Payment.count({ where: { tuition_fee_id: tuitionFee.id } });
+        if (paymentCount > 0) {
+            throw new HttpError(
+                "Impossible de supprimer cette échéance : des paiements ont déjà été enregistrés dessus. Supprimez d'abord ces paiements.",
+                400
+            );
+        }
+
         await tuitionFee.destroy();
     }
 }
