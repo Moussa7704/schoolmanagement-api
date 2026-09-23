@@ -1,4 +1,4 @@
-const { Grade, Assessment, TeacherAssignment, Enrollment, Student } = require("../models")
+const { Grade, Assessment, TeacherAssignment, Enrollment, Student, Subject } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const assessmentService = require("./assessment.service");
@@ -92,6 +92,18 @@ class GradeService extends BaseService {
 
         return this.model.findAll({
             where,
+            // Jointure jusqu'à la matière : un score seul (assessment_id, score) n'a
+            // aucun sens pour un consommateur (ex: le suivi parent) sans savoir de
+            // quelle matière/évaluation il s'agit.
+            include: [{
+                model: Assessment,
+                as: 'Assessment',
+                include: [{
+                    model: TeacherAssignment,
+                    as: 'TeacherAssignment',
+                    include: [{ model: Subject, as: 'Subject' }]
+                }]
+            }],
             order: [["id", "ASC"]]
         });
     }

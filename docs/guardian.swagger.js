@@ -125,6 +125,22 @@
 
 /**
  * @swagger
+ * /guardians/me/children:
+ *   get:
+ *     summary: "Suivi des enfants : liste des enfants rattachés au compte parent connecté"
+ *     description: Auto-scopé au tuteur/responsable connecté (aucun paramètre) — sert d'entrée pour consulter ensuite ses notes/présences/bulletins/scolarité via les endpoints existants avec `?student_id=`.
+ *     tags: [Tuteurs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Liste des enfants (avec classe active), vide si aucun lien StudentGuardian
+ *       400:
+ *         description: Ce compte n'est pas rattaché à un profil tuteur/responsable
+ */
+
+/**
+ * @swagger
  * /guardians/{id}/grant-access:
  *   post:
  *     summary: Créer un compte de connexion pour un tuteur/responsable qui n'en a pas encore
