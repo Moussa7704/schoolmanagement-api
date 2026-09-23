@@ -48,6 +48,7 @@ const reportCardRoutes = require("./routes/reportcard")
 const attendanceRoutes = require("./routes/attendance")
 const tuitionFeeRoutes = require("./routes/tuitionfee")
 const paymentRoutes = require("./routes/payment")
+const scheduleRoutes = require("./routes/schedule")
 
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/users', userRoutes)
@@ -70,6 +71,7 @@ app.use('/api/v1/report-cards', reportCardRoutes)
 app.use('/api/v1/attendances', attendanceRoutes)
 app.use('/api/v1/tuition-fees', tuitionFeeRoutes)
 app.use('/api/v1/payments', paymentRoutes)
+app.use('/api/v1/schedules', scheduleRoutes)
 
 
 
