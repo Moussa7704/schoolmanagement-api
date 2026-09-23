@@ -2,6 +2,7 @@ const { Class, AcademicYear, Enrollment, Student } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
+const enrollmentService = require("./enrollment.service");
 
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
 
@@ -127,6 +128,47 @@ class ClassService extends BaseService {
     async delete(id, currentUser) {
         const classRecord = await this._findWithAccess(id, currentUser);
         await classRecord.destroy();
+    }
+
+    // "Classe suivante" : promeut en masse les élèves actuellement ACTIVE de
+    // cette classe vers une classe cible (généralement l'année scolaire
+    // suivante). L'inscription de l'année en cours n'est jamais modifiée —
+    // conformément au modèle "Enrollment = historique par année" (voir
+    // data_model_phase1) — on crée uniquement de nouvelles inscriptions.
+    // `promotions` permet d'envoyer des élèves vers des classes différentes en
+    // une seule opération (ex: la majorité passe en classe supérieure, certains
+    // redoublent dans une classe de même niveau, statut REPEATING).
+    async promote(id, promotions, currentUser) {
+        const sourceClass = await this._findWithAccess(id, currentUser);
+
+        if (!Array.isArray(promotions) || promotions.length === 0) {
+            throw new HttpError("La liste des promotions (promotions: [{ student_id, target_class_id }]) est requise.", 400);
+        }
+
+        const activeEnrollments = await Enrollment.findAll({
+            where: { class_id: sourceClass.id, status: 'ACTIVE' }
+        });
+        const activeStudentIds = new Set(activeEnrollments.map((e) => e.student_id));
+
+        const results = [];
+        for (const entry of promotions) {
+            const { student_id, target_class_id, status } = entry;
+
+            if (!student_id || !target_class_id) {
+                throw new HttpError("student_id et target_class_id sont requis pour chaque promotion.", 400);
+            }
+            if (!activeStudentIds.has(Number(student_id))) {
+                throw new HttpError(`L'élève ${student_id} n'a pas d'inscription active dans cette classe.`, 400);
+            }
+
+            const enrollment = await enrollmentService.create(
+                { student_id, class_id: target_class_id, status: status ?? 'ACTIVE' },
+                currentUser
+            );
+            results.push(enrollment);
+        }
+
+        return results;
     }
 }
 

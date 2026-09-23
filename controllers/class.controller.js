@@ -74,6 +74,25 @@ const updateClass = async (req, res) => {
     }
 };
 
+const promoteClass = async (req, res) => {
+    try {
+        const enrollments = await classService.promote(req.params.id, req.body.promotions, req.user);
+
+        return sendResponse(res, {
+            message: "Élèves promus avec succès",
+            data: enrollments,
+            status: 201
+        });
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 400
+        });
+    }
+};
+
 const deleteClass = async (req, res) => {
     try {
         await classService.delete(req.params.id, req.user);
@@ -96,5 +115,6 @@ module.exports = {
     listClasses,
     getClassById,
     updateClass,
+    promoteClass,
     deleteClass
 }

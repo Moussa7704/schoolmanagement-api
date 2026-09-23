@@ -28,6 +28,19 @@ class EnrollmentService extends BaseService {
         return { classRecord, academicYear };
     }
 
+    async _assertStudentSchoolAccess(studentId, currentUser) {
+        if (isSuperAdmin(currentUser)) {
+            return;
+        }
+        const student = await Student.findByPk(studentId);
+        if (!student) {
+            throw new HttpError("Élève introuvable", 404);
+        }
+        if (student.school_id !== currentUser.school_id) {
+            throw new HttpError("Accès refusé", 403);
+        }
+    }
+
     async create(data, currentUser) {
         const { student_id, class_id, status, enrollment_date, registration_number } = data;
 
@@ -82,6 +95,7 @@ class EnrollmentService extends BaseService {
             await this._assertClassAccess(query.class_id, currentUser);
         } else if (query.student_id) {
             where.student_id = query.student_id;
+            await this._assertStudentSchoolAccess(query.student_id, currentUser);
         } else if (!isSuperAdmin(currentUser)) {
             const academicYears = await AcademicYear.findAll({
                 where: { school_id: currentUser.school_id },

@@ -28,6 +28,12 @@ router.put('/:id',
     classController.updateClass
 )
 
+router.post('/:id/promote',
+    authenticate,
+    authorize(permissions.ENROLLMENTS_CREATE),
+    classController.promoteClass
+)
+
 router.delete('/:id',
     authenticate,
     authorize(permissions.CLASSES_DELETE),

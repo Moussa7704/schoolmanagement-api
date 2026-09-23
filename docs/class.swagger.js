@@ -117,6 +117,57 @@
 
 /**
  * @swagger
+ * /classes/{id}/promote:
+ *   post:
+ *     summary: "Classe suivante : promouvoir en masse les élèves actifs de cette classe vers une autre"
+ *     description: Ne modifie jamais l'inscription de l'année en cours (historique préservé) — crée une nouvelle inscription par élève dans la classe cible (généralement l'année scolaire suivante). Permet d'envoyer certains élèves vers une autre classe que les autres (ex redoublement, statut REPEATING).
+ *     tags: [Classes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - promotions
+ *             properties:
+ *               promotions:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - student_id
+ *                     - target_class_id
+ *                   properties:
+ *                     student_id:
+ *                       type: integer
+ *                     target_class_id:
+ *                       type: integer
+ *                     status:
+ *                       type: string
+ *                       enum: [ACTIVE, REPEATING]
+ *                       default: ACTIVE
+ *     responses:
+ *       201:
+ *         description: Nouvelles inscriptions créées dans les classes cibles
+ *       400:
+ *         description: Élève sans inscription active dans la classe source, ou déjà inscrit dans la classe cible
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Classe source, élève ou classe cible introuvable
+ */
+
+/**
+ * @swagger
  * /classes/{id}:
  *   delete:
  *     summary: Supprimer une classe
