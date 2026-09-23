@@ -3,6 +3,7 @@ const { Attendance, Student, Class, AcademicYear, TeacherAssignment, Enrollment,
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
+const { isParent, getChildStudentIds, assertParentCanAccessStudent } = require("../utils/parentAccess");
 
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
 const isTeacher = (currentUser) => currentUser?.Role?.name === roles.TEACHER;
@@ -60,6 +61,23 @@ class AttendanceService extends BaseService {
         return classes.map((c) => c.id);
     }
 
+    async _assertStudentReadAccess(studentId, currentUser) {
+        if (isParent(currentUser)) {
+            await assertParentCanAccessStudent(studentId, currentUser);
+            return;
+        }
+        if (isSuperAdmin(currentUser)) {
+            return;
+        }
+        const student = await Student.findByPk(studentId);
+        if (!student) {
+            throw new HttpError("Élève introuvable", 404);
+        }
+        if (student.school_id !== currentUser.school_id) {
+            throw new HttpError("Accès refusé", 403);
+        }
+    }
+
     async create(data, currentUser) {
         const { student_id, class_id, date, session, status, justified, reason } = data;
 
@@ -105,6 +123,9 @@ class AttendanceService extends BaseService {
             await this._assertClassAccess(query.class_id, currentUser);
         } else if (query.student_id) {
             where.student_id = query.student_id;
+            await this._assertStudentReadAccess(query.student_id, currentUser);
+        } else if (isParent(currentUser)) {
+            where.student_id = await getChildStudentIds(currentUser);
         } else if (!isSuperAdmin(currentUser)) {
             where.class_id = await this._classIdsForScope(currentUser);
         }
@@ -128,6 +149,14 @@ class AttendanceService extends BaseService {
     }
 
     async getById(id, currentUser) {
+        if (isParent(currentUser)) {
+            const attendance = await this.model.findByPk(id);
+            if (!attendance) {
+                throw new HttpError("Présence introuvable", 404);
+            }
+            await assertParentCanAccessStudent(attendance.student_id, currentUser);
+            return attendance;
+        }
         return this._findWithAccess(id, currentUser);
     }
 
@@ -161,9 +190,7 @@ class AttendanceService extends BaseService {
         if (!student) {
             throw new HttpError("Élève introuvable", 404);
         }
-        if (!isSuperAdmin(currentUser) && student.school_id !== currentUser.school_id) {
-            throw new HttpError("Accès refusé", 403);
-        }
+        await this._assertStudentReadAccess(student_id, currentUser);
 
         const period = await Period.findByPk(period_id);
         if (!period) {

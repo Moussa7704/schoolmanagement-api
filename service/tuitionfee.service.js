@@ -2,6 +2,7 @@ const { TuitionFee, Student, Payment } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
+const { isParent, getChildStudentIds, assertParentCanAccessStudent } = require("../utils/parentAccess");
 
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
 
@@ -70,7 +71,13 @@ class TuitionFeeService extends BaseService {
 
         if (query.student_id) {
             where.student_id = query.student_id;
-            await this._assertStudentAccess(query.student_id, currentUser);
+            if (isParent(currentUser)) {
+                await assertParentCanAccessStudent(query.student_id, currentUser);
+            } else {
+                await this._assertStudentAccess(query.student_id, currentUser);
+            }
+        } else if (isParent(currentUser)) {
+            where.student_id = await getChildStudentIds(currentUser);
         } else if (query.academic_year_id) {
             where.academic_year_id = query.academic_year_id;
         } else if (!isSuperAdmin(currentUser)) {
@@ -90,8 +97,20 @@ class TuitionFeeService extends BaseService {
         return tuitionFees.map((tf) => this._enrich(tf, tf.Payments));
     }
 
+    async _findReadable(id, currentUser) {
+        if (isParent(currentUser)) {
+            const tuitionFee = await this.model.findByPk(id);
+            if (!tuitionFee) {
+                throw new HttpError("Échéance introuvable", 404);
+            }
+            await assertParentCanAccessStudent(tuitionFee.student_id, currentUser);
+            return tuitionFee;
+        }
+        return this._findWithAccess(id, currentUser);
+    }
+
     async getById(id, currentUser) {
-        const tuitionFee = await this._findWithAccess(id, currentUser);
+        const tuitionFee = await this._findReadable(id, currentUser);
         const payments = await Payment.findAll({ where: { tuition_fee_id: tuitionFee.id } });
         return this._enrich(tuitionFee, payments);
     }

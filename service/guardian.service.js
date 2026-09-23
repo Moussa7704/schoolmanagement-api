@@ -1,4 +1,4 @@
-const { Guardian, User, Role, sequelize } = require("../models")
+const { Guardian, User, Role, Student, Class, StudentGuardian, sequelize } = require("../models")
 const bcrypt = require("bcrypt");
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
@@ -109,6 +109,43 @@ class GuardianService extends BaseService {
             await t.rollback();
             throw err;
         }
+    }
+
+    async getMyChildren(currentUser) {
+        if (!currentUser?.Guardian?.id) {
+            throw new HttpError("Ce compte n'est pas rattaché à un profil tuteur/responsable.", 400);
+        }
+
+        const links = await StudentGuardian.findAll({
+            where: { guardian_id: currentUser.Guardian.id },
+            include: [{
+                model: Student,
+                include: [{
+                    model: Class,
+                    as: "Classes",
+                    through: { where: { status: 'ACTIVE' } },
+                    required: false
+                }]
+            }]
+        });
+
+        return links
+            .filter((link) => link.Student)
+            .map((link) => {
+                const student = link.Student;
+                const activeClass = student.Classes?.[0] ?? null;
+
+                return {
+                    student_id: student.id,
+                    first_name: student.first_name,
+                    last_name: student.last_name,
+                    student_number: student.student_number,
+                    relationship: link.relationship,
+                    is_primary_contact: link.is_primary_contact,
+                    class_id: activeClass?.id ?? null,
+                    class_name: activeClass?.name ?? null
+                };
+            });
     }
 }
 

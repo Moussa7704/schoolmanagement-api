@@ -5,6 +5,7 @@ const {
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
+const { isParent, getChildStudentIds, assertParentCanAccessStudent } = require("../utils/parentAccess");
 
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
 
@@ -79,13 +80,19 @@ class ReportCardService extends BaseService {
 
         if (query.student_id) {
             where.student_id = query.student_id;
-            const student = await Student.findByPk(query.student_id);
-            if (student) {
-                await this._assertSchoolAccess(student.school_id, currentUser);
+            if (isParent(currentUser)) {
+                await assertParentCanAccessStudent(query.student_id, currentUser);
+            } else {
+                const student = await Student.findByPk(query.student_id);
+                if (student) {
+                    await this._assertSchoolAccess(student.school_id, currentUser);
+                }
             }
         } else if (query.class_id) {
             where.class_id = query.class_id;
             await this._assertClassAccess(query.class_id, currentUser);
+        } else if (isParent(currentUser)) {
+            where.student_id = await getChildStudentIds(currentUser);
         } else if (!isSuperAdmin(currentUser)) {
             const academicYears = await AcademicYear.findAll({
                 where: { school_id: currentUser.school_id },
@@ -124,8 +131,20 @@ class ReportCardService extends BaseService {
         return reportCard;
     }
 
+    async _findReadable(id, currentUser) {
+        if (isParent(currentUser)) {
+            const reportCard = await this.model.findByPk(id);
+            if (!reportCard) {
+                throw new HttpError("Bulletin introuvable", 404);
+            }
+            await assertParentCanAccessStudent(reportCard.student_id, currentUser);
+            return reportCard;
+        }
+        return this._findWithAccess(id, currentUser);
+    }
+
     async getById(id, currentUser) {
-        const reportCard = await this._findWithAccess(id, currentUser);
+        const reportCard = await this._findReadable(id, currentUser);
 
         const grades = await Grade.findAll({
             where: { student_id: reportCard.student_id },

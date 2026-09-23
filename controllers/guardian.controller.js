@@ -109,11 +109,30 @@ const grantAccess = async (req, res) => {
     }
 };
 
+const getMyChildren = async (req, res) => {
+    try {
+        const children = await guardianService.getMyChildren(req.user);
+
+        return sendResponse(res, {
+            message: "Liste de vos enfants récupérée avec succès",
+            data: children
+        });
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 400
+        });
+    }
+};
+
 module.exports = {
     createGuardian,
     listGuardians,
     getGuardianById,
     updateGuardian,
     deleteGuardian,
-    grantAccess
+    grantAccess,
+    getMyChildren
 }

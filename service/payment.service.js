@@ -3,6 +3,7 @@ const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const tuitionFeeService = require("./tuitionfee.service");
 const roles = require("../constants/roles");
+const { isParent, getChildStudentIds, assertParentCanAccessStudent } = require("../utils/parentAccess");
 
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
 
@@ -45,7 +46,25 @@ class PaymentService extends BaseService {
 
         if (query.tuition_fee_id) {
             where.tuition_fee_id = query.tuition_fee_id;
-            await tuitionFeeService._findWithAccess(query.tuition_fee_id, currentUser);
+            await tuitionFeeService._findReadable(query.tuition_fee_id, currentUser);
+        } else if (query.student_id) {
+            if (isParent(currentUser)) {
+                await assertParentCanAccessStudent(query.student_id, currentUser);
+            } else {
+                await tuitionFeeService._assertStudentAccess(query.student_id, currentUser);
+            }
+            const tuitionFees = await tuitionFeeService.model.findAll({
+                where: { student_id: query.student_id },
+                attributes: ["id"]
+            });
+            where.tuition_fee_id = tuitionFees.map((tf) => tf.id);
+        } else if (isParent(currentUser)) {
+            const childIds = await getChildStudentIds(currentUser);
+            const tuitionFees = await tuitionFeeService.model.findAll({
+                where: { student_id: childIds },
+                attributes: ["id"]
+            });
+            where.tuition_fee_id = tuitionFees.map((tf) => tf.id);
         } else if (!isSuperAdmin(currentUser)) {
             const students = await Student.findAll({
                 where: { school_id: currentUser.school_id },
@@ -73,8 +92,17 @@ class PaymentService extends BaseService {
         return payment;
     }
 
+    async _findReadable(id, currentUser) {
+        const payment = await this.model.findByPk(id);
+        if (!payment) {
+            throw new HttpError("Paiement introuvable", 404);
+        }
+        await tuitionFeeService._findReadable(payment.tuition_fee_id, currentUser);
+        return payment;
+    }
+
     async getById(id, currentUser) {
-        return this._findWithAccess(id, currentUser);
+        return this._findReadable(id, currentUser);
     }
 
     async delete(id, currentUser) {

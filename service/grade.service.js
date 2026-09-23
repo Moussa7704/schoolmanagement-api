@@ -1,7 +1,9 @@
-const { Grade, Assessment, TeacherAssignment, Enrollment } = require("../models")
+const { Grade, Assessment, TeacherAssignment, Enrollment, Student } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const assessmentService = require("./assessment.service");
+const roles = require("../constants/roles");
+const { isParent, getChildStudentIds, assertParentCanAccessStudent } = require("../utils/parentAccess");
 
 class GradeService extends BaseService {
     constructor() {
@@ -55,6 +57,23 @@ class GradeService extends BaseService {
         return super.create({ assessment_id, student_id, score });
     }
 
+    async _assertStudentReadAccess(studentId, currentUser) {
+        if (isParent(currentUser)) {
+            await assertParentCanAccessStudent(studentId, currentUser);
+            return;
+        }
+        if (currentUser?.Role?.name === roles.SUPER_ADMIN) {
+            return;
+        }
+        const student = await Student.findByPk(studentId);
+        if (!student) {
+            throw new HttpError("Élève introuvable", 404);
+        }
+        if (student.school_id !== currentUser.school_id) {
+            throw new HttpError("Accès refusé", 403);
+        }
+    }
+
     async list(currentUser, query = {}) {
         const where = {};
 
@@ -63,6 +82,9 @@ class GradeService extends BaseService {
             await this._assertAssessmentAccess(query.assessment_id, currentUser);
         } else if (query.student_id) {
             where.student_id = query.student_id;
+            await this._assertStudentReadAccess(query.student_id, currentUser);
+        } else if (isParent(currentUser)) {
+            where.student_id = await getChildStudentIds(currentUser);
         } else {
             const assessments = await assessmentService.list(currentUser);
             where.assessment_id = assessments.map((a) => a.id);
@@ -87,6 +109,14 @@ class GradeService extends BaseService {
     }
 
     async getById(id, currentUser) {
+        if (isParent(currentUser)) {
+            const grade = await this.model.findByPk(id);
+            if (!grade) {
+                throw new HttpError("Note introuvable", 404);
+            }
+            await assertParentCanAccessStudent(grade.student_id, currentUser);
+            return grade;
+        }
         return this._findWithAccess(id, currentUser);
     }
 

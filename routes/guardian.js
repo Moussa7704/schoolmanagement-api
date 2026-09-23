@@ -4,6 +4,11 @@ const permissions = require("../constants/permissions")
 const guardianController = require("../controllers/guardian.controller")
 const { authenticate, authorize } = require("../middlewares/auth")
 
+router.get('/me/children',
+    authenticate,
+    guardianController.getMyChildren
+)
+
 router.post('/',
     authenticate,
     authorize(permissions.GUARDIANS_CREATE),
