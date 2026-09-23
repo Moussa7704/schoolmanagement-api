@@ -28,6 +28,12 @@ router.put('/:id',
     tuitionFeeController.updateTuitionFee
 )
 
+router.get('/:id/invoice',
+    authenticate,
+    authorize(permissions.TUITION_FEES_VIEW),
+    tuitionFeeController.downloadTuitionFeeInvoice
+)
+
 router.delete('/:id',
     authenticate,
     authorize(permissions.TUITION_FEES_DELETE),

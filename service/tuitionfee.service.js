@@ -1,4 +1,5 @@
-const { TuitionFee, Student, Payment } = require("../models")
+const PDFDocument = require("pdfkit");
+const { TuitionFee, Student, Payment, School, AcademicYear } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
@@ -144,6 +145,73 @@ class TuitionFeeService extends BaseService {
         }
 
         await tuitionFee.destroy();
+    }
+
+    // Numéro de facture dérivé de l'id de l'échéance — même principe que le
+    // numéro de reçu côté Payment : unique et séquentiel sans colonne dédiée.
+    _invoiceNumber(tuitionFeeId) {
+        return `FACT-${String(tuitionFeeId).padStart(6, "0")}`;
+    }
+
+    async generateInvoicePdf(id, currentUser) {
+        const tuitionFee = await this._findReadable(id, currentUser);
+
+        const [student, academicYear, payments] = await Promise.all([
+            Student.findByPk(tuitionFee.student_id, { include: [{ model: School, as: "School" }] }),
+            AcademicYear.findByPk(tuitionFee.academic_year_id),
+            Payment.findAll({ where: { tuition_fee_id: tuitionFee.id } })
+        ]);
+        const school = student.School;
+        const enriched = this._enrich(tuitionFee, payments);
+
+        const STATUS_LABELS = {
+            PAID: "Payée",
+            OVERDUE: "En retard",
+            PARTIAL: "Partiellement payée",
+            PENDING: "En attente"
+        };
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ size: "A4", margin: 50 });
+            const chunks = [];
+            doc.on("data", (chunk) => chunks.push(chunk));
+            doc.on("end", () => resolve(Buffer.concat(chunks)));
+            doc.on("error", reject);
+
+            doc.fontSize(16).text(school?.name || "Établissement scolaire", { align: "center" });
+            if (school?.address) {
+                doc.fontSize(10).text(school.address, { align: "center" });
+            }
+            doc.moveDown(2);
+
+            doc.fontSize(14).text("FACTURE", { align: "center", underline: true });
+            doc.moveDown(1.5);
+
+            doc.fontSize(11);
+            doc.text(`Facture N° : ${this._invoiceNumber(tuitionFee.id)}`);
+            doc.text(`Année scolaire : ${academicYear?.label || "-"}`);
+            if (tuitionFee.due_date) {
+                doc.text(`Échéance le : ${tuitionFee.due_date}`);
+            }
+            doc.moveDown();
+
+            doc.text(`Élève : ${student.first_name} ${student.last_name}`);
+            doc.text(`Matricule : ${student.student_number || "-"}`);
+            doc.moveDown();
+
+            doc.text(`Motif : ${tuitionFee.label}`);
+            doc.text(`Montant dû : ${tuitionFee.amount.toFixed(2)}`);
+            doc.text(`Montant déjà payé : ${enriched.paid_amount.toFixed(2)}`);
+            doc.font("Helvetica-Bold");
+            doc.text(`Solde restant dû : ${enriched.balance.toFixed(2)}`);
+            doc.text(`Statut : ${STATUS_LABELS[enriched.status]}`);
+            doc.font("Helvetica");
+            doc.moveDown(3);
+
+            doc.text("Cachet et signature : ______________________", { align: "right" });
+
+            doc.end();
+        });
     }
 }
 

@@ -22,6 +22,12 @@ router.get('/:id',
     paymentController.getPaymentById
 )
 
+router.get('/:id/receipt',
+    authenticate,
+    authorize(permissions.PAYMENTS_VIEW),
+    paymentController.downloadPaymentReceipt
+)
+
 router.delete('/:id',
     authenticate,
     authorize(permissions.PAYMENTS_DELETE),

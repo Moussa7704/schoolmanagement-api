@@ -74,6 +74,26 @@ const updateTuitionFee = async (req, res) => {
     }
 };
 
+const downloadTuitionFeeInvoice = async (req, res) => {
+    try {
+        const pdfBuffer = await tuitionFeeService.generateInvoicePdf(req.params.id, req.user);
+
+        res.set({
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="facture-${req.params.id}.pdf"`,
+            "Content-Length": pdfBuffer.length
+        });
+        return res.status(200).send(pdfBuffer);
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 400
+        });
+    }
+};
+
 const deleteTuitionFee = async (req, res) => {
     try {
         await tuitionFeeService.delete(req.params.id, req.user);
@@ -96,5 +116,6 @@ module.exports = {
     listTuitionFees,
     getTuitionFeeById,
     updateTuitionFee,
+    downloadTuitionFeeInvoice,
     deleteTuitionFee
 }

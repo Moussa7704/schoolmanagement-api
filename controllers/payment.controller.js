@@ -56,6 +56,26 @@ const getPaymentById = async (req, res) => {
     }
 };
 
+const downloadPaymentReceipt = async (req, res) => {
+    try {
+        const pdfBuffer = await paymentService.generateReceiptPdf(req.params.id, req.user);
+
+        res.set({
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="recu-paiement-${req.params.id}.pdf"`,
+            "Content-Length": pdfBuffer.length
+        });
+        return res.status(200).send(pdfBuffer);
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 400
+        });
+    }
+};
+
 const deletePayment = async (req, res) => {
     try {
         await paymentService.delete(req.params.id, req.user);
@@ -77,5 +97,6 @@ module.exports = {
     createPayment,
     listPayments,
     getPaymentById,
+    downloadPaymentReceipt,
     deletePayment
 }

@@ -125,10 +125,38 @@
 
 /**
  * @swagger
+ * /tuition-fees/{id}/invoice:
+ *   get:
+ *     summary: Télécharger la facture au format PDF
+ *     tags: [Scolarité]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Fichier PDF de la facture
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Échéance introuvable
+ */
+
+/**
+ * @swagger
  * /tuition-fees/{id}:
  *   delete:
  *     summary: Supprimer une échéance
- *     description: Supprime aussi les paiements liés (cascade).
+ *     description: Rejeté si des paiements existent déjà sur cette échéance (ils doivent être supprimés d'abord).
  *     tags: [Scolarité]
  *     security:
  *       - bearerAuth: []
@@ -141,6 +169,8 @@
  *     responses:
  *       200:
  *         description: Échéance supprimée
+ *       400:
+ *         description: Des paiements existent déjà sur cette échéance
  *       403:
  *         description: Accès refusé
  *       404:
