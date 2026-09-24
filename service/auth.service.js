@@ -1,4 +1,4 @@
-const { User, Otp, RefreshToken, PasswordReset, Role, Permission } = require("../models")
+const { User, Otp, RefreshToken, PasswordReset, Role, Permission, School } = require("../models")
 const bcrypt = require("bcrypt")
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -152,6 +152,8 @@ class AuthService extends BaseService {
             include: [{
                 model: Role, as: 'Role',
                 include: [{ model: Permission, as: 'Permissions' }]
+            }, {
+                model: School, as: 'School'
             }],
             attributes: { exclude: ["password"] }
         });
@@ -186,7 +188,7 @@ class AuthService extends BaseService {
         });
 
         return this.model.findByPk(user.id, {
-            include: ["Role"],
+            include: ["Role", "School"],
             attributes: { exclude: ["password"] }
         });
     }
