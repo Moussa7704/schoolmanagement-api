@@ -6,6 +6,8 @@ const enrollmentService = require("./enrollment.service");
 
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
 
+const CYCLES = ['PRESCOLAIRE', 'PRIMAIRE', 'COLLEGE', 'LYCEE', 'SUPERIEUR'];
+
 // Student.gender est un champ libre (pas d'enum en base) : on normalise pour
 // accepter aussi bien "M"/"F" que "Homme"/"Femme" saisis dans /students.
 const BOY_VALUES = new Set(['M', 'H', 'MALE', 'HOMME', 'GARCON']);
@@ -60,16 +62,23 @@ class ClassService extends BaseService {
         return { ...classRecord.toJSON(), ...counts };
     }
 
+    _assertValidCycle(cycle) {
+        if (cycle !== undefined && cycle !== null && !CYCLES.includes(cycle)) {
+            throw new HttpError(`cycle doit être l'un de : ${CYCLES.join(', ')}.`, 400);
+        }
+    }
+
     async create(data, currentUser) {
-        const { academic_year_id, name, level, capacity } = data;
+        const { academic_year_id, name, level, cycle, capacity } = data;
 
         if (!academic_year_id || !name) {
             throw new HttpError("academic_year_id et name sont requis.", 400);
         }
+        this._assertValidCycle(cycle);
 
         await this._assertAcademicYearAccess(academic_year_id, currentUser);
 
-        return super.create({ academic_year_id, name, level, capacity });
+        return super.create({ academic_year_id, name, level, cycle, capacity });
     }
 
     async list(currentUser, query = {}) {
@@ -84,6 +93,10 @@ class ClassService extends BaseService {
                 attributes: ["id"]
             });
             where.academic_year_id = academicYears.map((a) => a.id);
+        }
+
+        if (query.cycle) {
+            where.cycle = query.cycle;
         }
 
         const classes = await this.model.findAll({
@@ -114,11 +127,13 @@ class ClassService extends BaseService {
     async update(id, data, currentUser) {
         const classRecord = await this._findWithAccess(id, currentUser);
 
-        const { name, level, capacity } = data;
+        const { name, level, cycle, capacity } = data;
+        this._assertValidCycle(cycle);
 
         await classRecord.update({
             name: name ?? classRecord.name,
             level: level ?? classRecord.level,
+            cycle: cycle ?? classRecord.cycle,
             capacity: capacity ?? classRecord.capacity
         });
 

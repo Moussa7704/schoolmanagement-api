@@ -38,6 +38,7 @@ module.exports = (sequelize, DataTypes) => {
     academic_year_id: DataTypes.INTEGER,
     name: DataTypes.STRING,
     level: DataTypes.STRING,
+    cycle: DataTypes.ENUM('PRESCOLAIRE', 'PRIMAIRE', 'COLLEGE', 'LYCEE', 'SUPERIEUR'),
     capacity: DataTypes.INTEGER
   }, {
     sequelize,
