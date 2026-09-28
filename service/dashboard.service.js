@@ -54,6 +54,34 @@ async function attendanceRate(classIds) {
     return Number((1 - absent / total).toFixed(2));
 }
 
+// Agrégat par cycle (Préscolaire/Primaire/Collège/Lycée/Supérieur) — une classe
+// sans cycle renseigné est regroupée sous `null` plutôt qu'exclue, pour rester
+// visible tant que les classes existantes n'ont pas toutes été reclassées.
+async function cycleBreakdown(classRecords) {
+    const groups = new Map();
+    for (const c of classRecords) {
+        const key = c.cycle ?? null;
+        if (!groups.has(key)) {
+            groups.set(key, []);
+        }
+        groups.get(key).push(c.id);
+    }
+
+    return Promise.all(Array.from(groups.entries()).map(async ([cycle, ids]) => {
+        const [students_count, attendance] = await Promise.all([
+            Enrollment.count({ where: { class_id: ids, status: 'ACTIVE' } }),
+            attendanceRate(ids)
+        ]);
+
+        return {
+            cycle,
+            classes_count: ids.length,
+            students_count,
+            attendance_rate: attendance
+        };
+    }));
+}
+
 // Détail classe par classe — une seule moyenne pour toute une école masque les
 // écarts réels (une classe à 60% de présence noyée dans une moyenne à 95%).
 async function classBreakdown(classIds) {
@@ -103,15 +131,17 @@ class DashboardService {
         let tuition = summarizeTuitionFees([]);
         let report_cards = { validated_count: 0, draft_count: 0 };
         let classes = [];
+        let cycles = [];
 
         if (currentAcademicYear) {
-            const classRecords = await Class.findAll({ where: { academic_year_id: currentAcademicYear.id }, attributes: ["id"] });
+            const classRecords = await Class.findAll({ where: { academic_year_id: currentAcademicYear.id }, attributes: ["id", "cycle"] });
             const classIds = classRecords.map((c) => c.id);
             classes_count = classIds.length;
 
             active_enrollments_count = await Enrollment.count({ where: { class_id: classIds, status: 'ACTIVE' } });
             attendance_rate = await attendanceRate(classIds);
             classes = await classBreakdown(classIds);
+            cycles = await cycleBreakdown(classRecords);
 
             const tuitionFees = await TuitionFee.findAll({
                 where: { academic_year_id: currentAcademicYear.id },
@@ -139,7 +169,8 @@ class DashboardService {
             attendance_rate,
             tuition,
             report_cards,
-            classes
+            classes,
+            cycles
         };
     }
 
