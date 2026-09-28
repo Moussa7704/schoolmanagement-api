@@ -42,16 +42,23 @@ function summarizeTuitionFees(tuitionFees) {
     };
 }
 
-async function attendanceRate(classIds) {
+async function attendanceCounts(classIds) {
     if (!classIds.length) {
-        return null;
+        return { total: 0, absent: 0 };
     }
-    const total = await Attendance.count({ where: { class_id: classIds } });
-    if (!total) {
-        return null;
-    }
-    const absent = await Attendance.count({ where: { class_id: classIds, status: 'ABSENT' } });
-    return Number((1 - absent / total).toFixed(2));
+    const [total, absent] = await Promise.all([
+        Attendance.count({ where: { class_id: classIds } }),
+        Attendance.count({ where: { class_id: classIds, status: 'ABSENT' } })
+    ]);
+    return { total, absent };
+}
+
+function rateFromCounts({ total, absent }) {
+    return total ? Number((1 - absent / total).toFixed(2)) : null;
+}
+
+async function attendanceRate(classIds) {
+    return rateFromCounts(await attendanceCounts(classIds));
 }
 
 // Agrégat par cycle (Préscolaire/Primaire/Collège/Lycée/Supérieur) — une classe
@@ -68,16 +75,21 @@ async function cycleBreakdown(classRecords) {
     }
 
     return Promise.all(Array.from(groups.entries()).map(async ([cycle, ids]) => {
-        const [students_count, attendance] = await Promise.all([
+        const [students_count, counts] = await Promise.all([
             Enrollment.count({ where: { class_id: ids, status: 'ACTIVE' } }),
-            attendanceRate(ids)
+            attendanceCounts(ids)
         ]);
 
         return {
             cycle,
             classes_count: ids.length,
             students_count,
-            attendance_rate: attendance
+            attendance_rate: rateFromCounts(counts),
+            // Comptes bruts, pas seulement le taux déjà arrondi — nécessaires pour
+            // recombiner correctement plusieurs écoles au niveau plateforme (on ne
+            // peut pas faire la moyenne de taux déjà calculés sans biaiser le résultat).
+            total_sessions: counts.total,
+            absent_count: counts.absent
         };
     }));
 }
@@ -192,10 +204,35 @@ class DashboardService {
             overdue_count: acc.overdue_count + s.tuition.overdue_count
         }), { students_count: 0, teachers_count: 0, classes_count: 0, total_due: 0, total_paid: 0, overdue_amount: 0, overdue_count: 0 });
 
+        // Même regroupement par cycle que _schoolStats, mais fusionné à travers
+        // toutes les écoles — recombine les comptes bruts de présence plutôt que
+        // de moyenner des taux déjà arrondis, pour rester exact.
+        const cycleTotals = new Map();
+        for (const s of perSchool) {
+            for (const c of s.cycles) {
+                const key = c.cycle ?? "__none__";
+                if (!cycleTotals.has(key)) {
+                    cycleTotals.set(key, { cycle: c.cycle, classes_count: 0, students_count: 0, total_sessions: 0, absent_count: 0 });
+                }
+                const entry = cycleTotals.get(key);
+                entry.classes_count += c.classes_count;
+                entry.students_count += c.students_count;
+                entry.total_sessions += c.total_sessions;
+                entry.absent_count += c.absent_count;
+            }
+        }
+        const cycles = Array.from(cycleTotals.values()).map((c) => ({
+            cycle: c.cycle,
+            classes_count: c.classes_count,
+            students_count: c.students_count,
+            attendance_rate: rateFromCounts({ total: c.total_sessions, absent: c.absent_count })
+        }));
+
         return {
             scope: "platform",
             schools_count: schools.length,
             ...totals,
+            cycles,
             schools: perSchool.map((s) => ({
                 school_id: s.school_id,
                 school_name: s.school_name,
