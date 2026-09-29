@@ -46,6 +46,10 @@
  *                 format: date
  *               employee_number:
  *                 type: string
+ *               gender:
+ *                 type: string
+ *                 enum: [M, F]
+ *                 description: Civilité dans l'emploi du temps (Mr / Mme). Facultatif.
  *     responses:
  *       201:
  *         description: Enseignant créé (User + Teacher)
@@ -96,7 +100,7 @@
  * @swagger
  * /teachers/{id}:
  *   put:
- *     summary: Modifier un enseignant (specialty, hire_date, employee_number)
+ *     summary: Modifier un enseignant (specialty, hire_date, employee_number, gender)
  *     tags: [Enseignants]
  *     security:
  *       - bearerAuth: []
@@ -112,6 +116,19 @@
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               specialty:
+ *                 type: string
+ *               hire_date:
+ *                 type: string
+ *                 format: date
+ *               employee_number:
+ *                 type: string
+ *               gender:
+ *                 type: string
+ *                 enum: [M, F]
+ *                 nullable: true
+ *                 description: Absent = inchangé ; null ou "" = effacé.
  *     responses:
  *       200:
  *         description: Enseignant modifié

@@ -29,7 +29,9 @@ module.exports = (sequelize, DataTypes) => {
     school_id: DataTypes.INTEGER,
     specialty: DataTypes.STRING,
     hire_date: DataTypes.DATEONLY,
-    employee_number: DataTypes.STRING
+    employee_number: DataTypes.STRING,
+    // "M" | "F" — sert à la civilité (Mr / Mme) dans l'emploi du temps.
+    gender: DataTypes.ENUM('M', 'F')
   }, {
     sequelize,
     modelName: 'Teacher',

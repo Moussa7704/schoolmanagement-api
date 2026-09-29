@@ -42,6 +42,13 @@ router.get('/:id/students/export',
     classController.exportClassStudents
 )
 
+// Emploi du temps de la classe en PDF (tranches horaires en lignes, jours en colonnes).
+router.get('/:id/schedule/export',
+    authenticate,
+    authorize(permissions.SCHEDULES_VIEW),
+    classController.exportClassSchedule
+)
+
 router.delete('/:id',
     authenticate,
     authorize(permissions.CLASSES_DELETE),

@@ -197,6 +197,35 @@
 
 /**
  * @swagger
+ * /classes/{id}/schedule/export:
+ *   get:
+ *     summary: Exporter l'emploi du temps de la classe (PDF)
+ *     description: PDF A4 paysage sur une page. Lignes = tranches horaires utilisées par la classe, colonnes = lundi → samedi (dimanche seulement s'il y a cours), cellules = matière, enseignant et salle.
+ *     tags: [Classes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Fichier PDF
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       403:
+ *         description: Accès refusé (classe d'une autre école, ou permission schedules.view manquante)
+ *       404:
+ *         description: Classe introuvable
+ */
+
+/**
+ * @swagger
  * /classes/{id}:
  *   delete:
  *     summary: Supprimer une classe

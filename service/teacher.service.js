@@ -11,8 +11,18 @@ class TeacherService extends BaseService {
         super(Teacher);
     }
 
+    // Genre facultatif : "M", "F", ou vide (non renseigné).
+    _parseGender(value) {
+        if (value === undefined || value === null || value === "") return null;
+        if (value !== "M" && value !== "F") {
+            throw new HttpError('gender doit valoir "M" ou "F".', 400);
+        }
+        return value;
+    }
+
     async create(data, currentUser) {
         const { first_name, last_name, email, password, specialty, hire_date, employee_number } = data;
+        const gender = this._parseGender(data.gender);
         let { school_id } = data;
 
         if (!isSuperAdmin(currentUser)) {
@@ -58,7 +68,8 @@ class TeacherService extends BaseService {
                 school_id,
                 specialty,
                 hire_date,
-                employee_number
+                employee_number,
+                gender
             }, { transaction: t });
 
             await t.commit();
@@ -112,7 +123,9 @@ class TeacherService extends BaseService {
         await teacher.update({
             specialty: specialty ?? teacher.specialty,
             hire_date: hire_date ?? teacher.hire_date,
-            employee_number: employee_number ?? teacher.employee_number
+            employee_number: employee_number ?? teacher.employee_number,
+            // Absent = inchangé ; null ou "" = effacé.
+            gender: data.gender === undefined ? teacher.gender : this._parseGender(data.gender)
         });
 
         return teacher;

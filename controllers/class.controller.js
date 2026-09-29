@@ -1,5 +1,6 @@
 const classService = require("../service/class.service")
 const classExportService = require("../service/classexport.service")
+const scheduleExportService = require("../service/scheduleexport.service")
 const { sendResponse } = require("../utils/message")
 
 const createClass = async (req, res) => {
@@ -131,6 +132,26 @@ const exportClassStudents = async (req, res) => {
     }
 };
 
+const exportClassSchedule = async (req, res) => {
+    try {
+        const { buffer, filename } = await scheduleExportService.exportSchedule(req.params.id, req.user);
+
+        res.set({
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${filename}"`,
+            "Content-Length": buffer.length
+        });
+        return res.status(200).send(Buffer.from(buffer));
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 500
+        });
+    }
+};
+
 module.exports = {
     createClass,
     listClasses,
@@ -138,5 +159,6 @@ module.exports = {
     updateClass,
     promoteClass,
     exportClassStudents,
+    exportClassSchedule,
     deleteClass
 }

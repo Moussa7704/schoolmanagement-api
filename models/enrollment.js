@@ -22,6 +22,16 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   Enrollment.init({
+    // id déclaré explicitement : ce modèle sert de table de liaison
+    // (belongsToMany ... through). Sans cela, Sequelize remplace l'id par une
+    // clé primaire composée des deux clés étrangères — les lignes perdent leur
+    // id et findByPk(id) chercherait sur la première clé étrangère.
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+      allowNull: false
+    },
     student_id: DataTypes.INTEGER,
     class_id: DataTypes.INTEGER,
     academic_year_id: DataTypes.INTEGER,

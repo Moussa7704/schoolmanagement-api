@@ -19,6 +19,16 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   StudentGuardian.init({
+    // id déclaré explicitement : ce modèle sert de table de liaison
+    // (belongsToMany ... through). Sans cela, Sequelize remplace l'id par une
+    // clé primaire composée des deux clés étrangères — les lignes perdent leur
+    // id et findByPk(id) chercherait sur la première clé étrangère.
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+      allowNull: false
+    },
     student_id: DataTypes.INTEGER,
     guardian_id: DataTypes.INTEGER,
     relationship: DataTypes.ENUM('PERE', 'MERE', 'TUTEUR', 'AUTRE'),
