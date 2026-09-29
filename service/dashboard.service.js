@@ -5,10 +5,76 @@ const {
 } = require("../models")
 const roles = require("../constants/roles");
 const { getChildStudentIds } = require("../utils/parentAccess");
+const { normalizeGender } = require("../utils/gender");
+
+// Clé de mois "YYYY-MM" à partir d'une DATEONLY ("2026-09-15") ou d'une Date.
+const monthKey = (value) => (value instanceof Date ? value.toISOString() : String(value)).slice(0, 7);
+
+// Tous les mois de l'année scolaire, du début jusqu'à la fin ou jusqu'au mois
+// courant si l'année n'est pas terminée — les mois futurs à 0 feraient
+// plonger les courbes à tort. Les mois sans activité sont gardés à 0 pour que
+// l'axe du temps reste continu.
+function academicYearMonths(academicYear) {
+    const months = [];
+    const current = monthKey(new Date());
+    const last = academicYear.end_date && monthKey(academicYear.end_date) < current
+        ? monthKey(academicYear.end_date)
+        : current;
+    let [year, month] = monthKey(academicYear.start_date).split("-").map(Number);
+
+    while (true) {
+        const key = `${year}-${String(month).padStart(2, "0")}`;
+        if (key > last) break;
+        months.push(key);
+        month += 1;
+        if (month > 12) {
+            month = 1;
+            year += 1;
+        }
+    }
+    return months;
+}
+
+// Remplit une série mensuelle à partir d'une liste d'éléments datés ; les
+// éléments hors de la plage de mois (saisis avant la rentrée, par ex.) sont
+// ignorés plutôt que d'étirer l'axe.
+function monthlySeries(months, items, getDate, getValue) {
+    const totals = new Map(months.map((m) => [m, 0]));
+    for (const item of items) {
+        const date = getDate(item);
+        if (!date) continue;
+        const key = monthKey(date);
+        if (totals.has(key)) {
+            totals.set(key, totals.get(key) + getValue(item));
+        }
+    }
+    return months.map((month) => ({ month, value: Number(totals.get(month).toFixed(2)) }));
+}
+
+// Fusionne les séries mensuelles de plusieurs écoles (dont les années scolaires
+// ne couvrent pas forcément les mêmes mois) en une seule série triée.
+function mergeMonthlySeries(seriesList) {
+    const totals = new Map();
+    for (const series of seriesList) {
+        for (const { month, value } of series) {
+            totals.set(month, (totals.get(month) ?? 0) + value);
+        }
+    }
+    if (!totals.size) {
+        return [];
+    }
+    // Comble les mois intermédiaires absents de toutes les écoles, pour garder
+    // un axe du temps continu.
+    const keys = Array.from(totals.keys()).sort();
+    const months = academicYearMonths({ start_date: keys[0], end_date: keys[keys.length - 1] });
+    return months.map((month) => ({ month, value: Number((totals.get(month) ?? 0).toFixed(2)) }));
+}
+
+const recoveryRate = (totalPaid, totalDue) => (totalDue > 0 ? Number((totalPaid / totalDue).toFixed(4)) : null);
 
 // Résume une liste d'échéances (avec leurs paiements déjà inclus) en agrégats
-// financiers — même règle de statut que TuitionFeeService._enrich, mais sur
-// tout un lot plutôt que ligne par ligne pour un seul appelant.
+// financiers — même règle de statut que TuitionFeeService._enrich (PAID >
+// OVERDUE > PARTIAL > PENDING), mais sur tout un lot plutôt que ligne par ligne.
 function summarizeTuitionFees(tuitionFees) {
     const now = new Date();
     let total_due = 0;
@@ -16,6 +82,8 @@ function summarizeTuitionFees(tuitionFees) {
     let overdue_amount = 0;
     let overdue_count = 0;
     let pending_count = 0;
+    let partial_count = 0;
+    let paid_count = 0;
 
     for (const tf of tuitionFees) {
         const paid = (tf.Payments || []).reduce((sum, p) => sum + p.amount, 0);
@@ -23,10 +91,14 @@ function summarizeTuitionFees(tuitionFees) {
         total_due += tf.amount;
         total_paid += paid;
 
-        if (balance > 0) {
+        if (balance <= 0) {
+            paid_count += 1;
+        } else {
             if (tf.due_date && new Date(tf.due_date) < now) {
                 overdue_amount += balance;
                 overdue_count += 1;
+            } else if (paid > 0) {
+                partial_count += 1;
             } else {
                 pending_count += 1;
             }
@@ -38,8 +110,32 @@ function summarizeTuitionFees(tuitionFees) {
         total_paid: Number(total_paid.toFixed(2)),
         overdue_amount: Number(overdue_amount.toFixed(2)),
         overdue_count,
-        pending_count
+        pending_count,
+        partial_count,
+        paid_count,
+        recovery_rate: recoveryRate(total_paid, total_due)
     };
+}
+
+// Garçons/filles parmi les inscriptions actives de l'année — même base que
+// les effectifs par classe, pour que les deux chiffres se recoupent.
+async function genderBreakdown(classIds) {
+    const breakdown = { boys_count: 0, girls_count: 0, unknown_count: 0 };
+    if (!classIds.length) {
+        return breakdown;
+    }
+
+    const enrollments = await Enrollment.findAll({
+        where: { class_id: classIds, status: 'ACTIVE' },
+        include: [{ model: Student, attributes: ["gender"] }]
+    });
+    for (const enrollment of enrollments) {
+        const gender = normalizeGender(enrollment.Student?.gender);
+        if (gender === 'M') breakdown.boys_count++;
+        else if (gender === 'F') breakdown.girls_count++;
+        else breakdown.unknown_count++;
+    }
+    return breakdown;
 }
 
 async function attendanceCounts(classIds) {
@@ -144,8 +240,12 @@ class DashboardService {
         let report_cards = { validated_count: 0, draft_count: 0 };
         let classes = [];
         let cycles = [];
+        let gender = await genderBreakdown([]);
+        let enrollments_by_month = [];
+        let payments_by_month = [];
 
         if (currentAcademicYear) {
+            const months = academicYearMonths(currentAcademicYear);
             const classRecords = await Class.findAll({ where: { academic_year_id: currentAcademicYear.id }, attributes: ["id", "cycle"] });
             const classIds = classRecords.map((c) => c.id);
             classes_count = classIds.length;
@@ -154,12 +254,26 @@ class DashboardService {
             attendance_rate = await attendanceRate(classIds);
             classes = await classBreakdown(classIds);
             cycles = await cycleBreakdown(classRecords);
+            gender = await genderBreakdown(classIds);
+
+            const enrollments = await Enrollment.findAll({
+                where: { academic_year_id: currentAcademicYear.id },
+                attributes: ["enrollment_date", "createdAt"]
+            });
+            // enrollment_date est facultatif : repli sur la date de saisie.
+            enrollments_by_month = monthlySeries(months, enrollments, (e) => e.enrollment_date ?? e.createdAt, () => 1);
 
             const tuitionFees = await TuitionFee.findAll({
                 where: { academic_year_id: currentAcademicYear.id },
                 include: [{ model: Payment, as: "Payments" }]
             });
             tuition = summarizeTuitionFees(tuitionFees);
+            payments_by_month = monthlySeries(
+                months,
+                tuitionFees.flatMap((tf) => tf.Payments || []),
+                (p) => p.payment_date ?? p.createdAt,
+                (p) => p.amount
+            );
 
             const periods = await Period.findAll({ where: { academic_year_id: currentAcademicYear.id }, attributes: ["id"] });
             const periodIds = periods.map((p) => p.id);
@@ -182,7 +296,10 @@ class DashboardService {
             tuition,
             report_cards,
             classes,
-            cycles
+            cycles,
+            gender,
+            enrollments_by_month,
+            payments_by_month
         };
     }
 
@@ -201,8 +318,20 @@ class DashboardService {
             total_due: acc.total_due + s.tuition.total_due,
             total_paid: acc.total_paid + s.tuition.total_paid,
             overdue_amount: acc.overdue_amount + s.tuition.overdue_amount,
-            overdue_count: acc.overdue_count + s.tuition.overdue_count
-        }), { students_count: 0, teachers_count: 0, classes_count: 0, total_due: 0, total_paid: 0, overdue_amount: 0, overdue_count: 0 });
+            overdue_count: acc.overdue_count + s.tuition.overdue_count,
+            pending_count: acc.pending_count + s.tuition.pending_count,
+            partial_count: acc.partial_count + s.tuition.partial_count,
+            paid_count: acc.paid_count + s.tuition.paid_count
+        }), { students_count: 0, teachers_count: 0, classes_count: 0, total_due: 0, total_paid: 0, overdue_amount: 0, overdue_count: 0, pending_count: 0, partial_count: 0, paid_count: 0 });
+        totals.total_due = Number(totals.total_due.toFixed(2));
+        totals.total_paid = Number(totals.total_paid.toFixed(2));
+        totals.overdue_amount = Number(totals.overdue_amount.toFixed(2));
+
+        const gender = perSchool.reduce((acc, s) => ({
+            boys_count: acc.boys_count + s.gender.boys_count,
+            girls_count: acc.girls_count + s.gender.girls_count,
+            unknown_count: acc.unknown_count + s.gender.unknown_count
+        }), { boys_count: 0, girls_count: 0, unknown_count: 0 });
 
         // Même regroupement par cycle que _schoolStats, mais fusionné à travers
         // toutes les écoles — recombine les comptes bruts de présence plutôt que
@@ -232,7 +361,11 @@ class DashboardService {
             scope: "platform",
             schools_count: schools.length,
             ...totals,
+            recovery_rate: recoveryRate(totals.total_paid, totals.total_due),
             cycles,
+            gender,
+            enrollments_by_month: mergeMonthlySeries(perSchool.map((s) => s.enrollments_by_month)),
+            payments_by_month: mergeMonthlySeries(perSchool.map((s) => s.payments_by_month)),
             schools: perSchool.map((s) => ({
                 school_id: s.school_id,
                 school_name: s.school_name,
