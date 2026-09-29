@@ -34,6 +34,14 @@ router.post('/:id/promote',
     classController.promoteClass
 )
 
+// Liste des élèves inscrits (actifs + redoublants) en PDF — gardée par la
+// permission des inscriptions, puisque c'est leur contenu qui est exporté.
+router.get('/:id/students/export',
+    authenticate,
+    authorize(permissions.ENROLLMENTS_VIEW),
+    classController.exportClassStudents
+)
+
 router.delete('/:id',
     authenticate,
     authorize(permissions.CLASSES_DELETE),
