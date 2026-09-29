@@ -22,6 +22,15 @@ router.get('/:id',
     schoolController.getSchoolById
 )
 
+// Réservé à SUPER_ADMIN uniquement (aucun nom de permission ne passe le
+// bypass explicite de `authorize` pour ce rôle dans middlewares/auth.js) —
+// SCHOOL_ADMIN ne doit pas pouvoir exporter les données d'une école.
+router.get('/:id/export',
+    authenticate,
+    authorize(),
+    schoolController.exportSchoolData
+)
+
 router.put('/:id',
     authenticate,
     authorize(permissions.SCHOOLS_UPDATE),

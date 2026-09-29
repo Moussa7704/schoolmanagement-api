@@ -1,4 +1,5 @@
 const schoolService = require("../service/school.service")
+const schoolExportService = require("../service/schoolexport.service")
 const { sendResponse } = require("../utils/message")
 
 const createSchool = async (req, res) => {
@@ -91,10 +92,31 @@ const deleteSchool = async (req, res) => {
     }
 };
 
+const exportSchoolData = async (req, res) => {
+    try {
+        const zipBuffer = await schoolExportService.exportSchoolData(req.params.id);
+
+        res.set({
+            "Content-Type": "application/zip",
+            "Content-Disposition": `attachment; filename="export-ecole-${req.params.id}.zip"`,
+            "Content-Length": zipBuffer.length
+        });
+        return res.status(200).send(zipBuffer);
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 500
+        });
+    }
+};
+
 module.exports = {
     createSchool,
     listSchools,
     getSchoolById,
     updateSchool,
-    deleteSchool
+    deleteSchool,
+    exportSchoolData
 }
