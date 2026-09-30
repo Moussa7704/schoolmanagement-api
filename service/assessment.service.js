@@ -6,6 +6,9 @@ const roles = require("../constants/roles");
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
 const isTeacher = (currentUser) => currentUser?.Role?.name === roles.TEACHER;
 
+// Vocabulaire des écoles maliennes : Devoir et Composition.
+const ASSESSMENT_TYPES = ['DEVOIR', 'COMPOSITION'];
+
 class AssessmentService extends BaseService {
     constructor() {
         super(Assessment);
@@ -56,12 +59,21 @@ class AssessmentService extends BaseService {
         return assignments.map((a) => a.id);
     }
 
+    // Message clair plutôt que l'erreur SQL de l'enum (Sequelize ne valide pas
+    // lui-même les valeurs d'un ENUM).
+    _assertValidType(type) {
+        if (type !== undefined && !ASSESSMENT_TYPES.includes(type)) {
+            throw new HttpError(`type doit valoir ${ASSESSMENT_TYPES.join(" ou ")}.`, 400);
+        }
+    }
+
     async create(data, currentUser) {
         const { teacher_assignment_id, period_id, name, type, coefficient, max_score, date } = data;
 
         if (!teacher_assignment_id || !period_id || !name) {
             throw new HttpError("teacher_assignment_id, period_id et name sont requis.", 400);
         }
+        this._assertValidType(type);
 
         const teacherAssignment = await this._assertTeacherAssignmentAccess(teacher_assignment_id, currentUser);
 
@@ -120,6 +132,7 @@ class AssessmentService extends BaseService {
         const assessment = await this._findWithAccess(id, currentUser);
 
         const { name, type, coefficient, max_score, date } = data;
+        this._assertValidType(type);
 
         await assessment.update({
             name: name ?? assessment.name,

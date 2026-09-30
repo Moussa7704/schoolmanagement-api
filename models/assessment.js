@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
     period_id: DataTypes.INTEGER,
     name: DataTypes.STRING,
     type: {
-      type: DataTypes.ENUM('DEVOIR', 'EXAMEN'),
+      type: DataTypes.ENUM('DEVOIR', 'COMPOSITION'),
       defaultValue: 'DEVOIR'
     },
     coefficient: {

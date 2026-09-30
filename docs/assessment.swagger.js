@@ -2,7 +2,7 @@
  * @swagger
  * tags:
  *   name: Évaluations
- *   description: Devoirs et examens rattachés à une affectation enseignant/matière/classe
+ *   description: Devoirs et compositions rattachés à une affectation enseignant/matière/classe
  */
 
 /**
@@ -34,7 +34,7 @@
  *                 example: Devoir 1
  *               type:
  *                 type: string
- *                 enum: [DEVOIR, EXAMEN]
+ *                 enum: [DEVOIR, COMPOSITION]
  *                 default: DEVOIR
  *               coefficient:
  *                 type: number

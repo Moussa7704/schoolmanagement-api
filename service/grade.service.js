@@ -42,11 +42,13 @@ class GradeService extends BaseService {
 
         const teacherAssignment = await TeacherAssignment.findByPk(assessment.teacher_assignment_id);
 
+        // Un redoublant (REPEATING) est dans la classe comme un élève actif ; un
+        // transféré ou un retiré n'y est plus.
         const enrollment = await Enrollment.findOne({
-            where: { student_id, class_id: teacherAssignment.class_id, status: 'ACTIVE' }
+            where: { student_id, class_id: teacherAssignment.class_id, status: ['ACTIVE', 'REPEATING'] }
         });
         if (!enrollment) {
-            throw new HttpError("Cet élève n'est pas inscrit activement dans cette classe.", 400);
+            throw new HttpError("Cet élève n'est pas inscrit dans la classe de cette évaluation.", 400);
         }
 
         const existing = await this.model.findOne({ where: { assessment_id, student_id } });

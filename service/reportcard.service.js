@@ -161,7 +161,7 @@ class ReportCardService extends BaseService {
 
     // Calcul malien, par matière enseignée dans la classe :
     //   Devoir  = moyenne simple des devoirs (somme / nombre), ramenés sur 20
-    //   Comp    = note de composition (EXAMEN), ramenée sur 20
+    //   Comp    = note de composition (COMPOSITION), ramenée sur 20
     //   Moy/20  = (Devoir × poids + Comp × poids) / somme des poids (constants/grading.js)
     //   Moy Gen = Moy/20 × coefficient de la matière
     // Moyenne générale = Σ Moy Gen / Σ coefficients des matières notées. Les
@@ -212,7 +212,7 @@ class ReportCardService extends BaseService {
             const assessment = grade.Assessment;
             const entry = ensureSubject(assessment.TeacherAssignment.Subject);
             const normalized = (grade.score / assessment.max_score) * 20;
-            (assessment.type === 'EXAMEN' ? entry.compositions : entry.devoirs).push(normalized);
+            (assessment.type === 'COMPOSITION' ? entry.compositions : entry.devoirs).push(normalized);
         }
 
         const mean = (values) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
