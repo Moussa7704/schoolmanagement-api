@@ -91,10 +91,29 @@ const deleteTeacher = async (req, res) => {
     }
 };
 
+const getMyClasses = async (req, res) => {
+    try {
+        const data = await teacherService.getMyClasses(req.user);
+
+        return sendResponse(res, {
+            message: "Classes de l'enseignant récupérées avec succès",
+            data
+        });
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 500
+        });
+    }
+};
+
 module.exports = {
     createTeacher,
     listTeachers,
     getTeacherById,
+    getMyClasses,
     updateTeacher,
     deleteTeacher
 }

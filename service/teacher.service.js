@@ -1,4 +1,6 @@
-const { Teacher, User, Role, School, sequelize } = require("../models")
+const {
+    Teacher, User, Role, School, TeacherAssignment, Class, Subject, Period, Enrollment, Student, sequelize
+} = require("../models")
 const bcrypt = require("bcrypt");
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
@@ -113,6 +115,72 @@ class TeacherService extends BaseService {
 
     async getById(id, currentUser) {
         return this._findWithAccess(id, currentUser);
+    }
+
+    // Espace de travail de l'enseignant connecté : uniquement SES affectations
+    // (classe + matière), les périodes de leurs années scolaires et les élèves
+    // inscrits dans SES classes. Remplace, pour un TEACHER, les listes générales
+    // (classes, élèves, inscriptions…) qu'il n'a pas le droit de lire et qui
+    // exposeraient toute l'école.
+    async getMyClasses(currentUser) {
+        const teacher = currentUser?.Teacher;
+        if (!teacher) {
+            throw new HttpError("Réservé aux comptes enseignants.", 403);
+        }
+
+        const assignments = await TeacherAssignment.findAll({
+            where: { teacher_id: teacher.id },
+            include: [
+                { model: Class, as: "Class" },
+                { model: Subject, as: "Subject" }
+            ],
+            order: [["id", "ASC"]]
+        });
+
+        const uniqueBy = (items) => [...new Map(items.filter(Boolean).map((item) => [item.id, item])).values()];
+        const classes = uniqueBy(assignments.map((a) => a.Class));
+        const subjects = uniqueBy(assignments.map((a) => a.Subject));
+        const classIds = classes.map((c) => c.id);
+        const academicYearIds = [...new Set(assignments.map((a) => a.academic_year_id))];
+
+        const [periods, enrollments] = await Promise.all([
+            Period.findAll({ where: { academic_year_id: academicYearIds }, order: [["start_date", "ASC"]] }),
+            Enrollment.findAll({
+                where: { class_id: classIds, status: ['ACTIVE', 'REPEATING'] },
+                include: [{ model: Student, attributes: ["id", "first_name", "last_name", "student_number", "gender"] }]
+            })
+        ]);
+
+        const students = uniqueBy(enrollments.map((e) => e.Student));
+
+        return {
+            teacher: {
+                id: teacher.id,
+                user_id: teacher.user_id,
+                school_id: teacher.school_id,
+                User: { first_name: currentUser.first_name, last_name: currentUser.last_name }
+            },
+            assignments: assignments.map((a) => ({
+                id: a.id,
+                teacher_id: a.teacher_id,
+                class_id: a.class_id,
+                subject_id: a.subject_id,
+                academic_year_id: a.academic_year_id
+            })),
+            classes,
+            subjects,
+            periods,
+            students,
+            enrollments: enrollments.map((e) => ({
+                id: e.id,
+                student_id: e.student_id,
+                class_id: e.class_id,
+                academic_year_id: e.academic_year_id,
+                status: e.status,
+                enrollment_date: e.enrollment_date,
+                registration_number: e.registration_number
+            }))
+        };
     }
 
     async update(id, data, currentUser) {

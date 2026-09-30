@@ -1,4 +1,4 @@
-const { Schedule, TeacherAssignment, Class, Teacher, Subject, AcademicYear } = require("../models")
+const { Schedule, TeacherAssignment, Class, Teacher, Subject, AcademicYear, User } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
@@ -10,7 +10,10 @@ const ASSIGNMENT_INCLUDE = {
     model: TeacherAssignment,
     as: 'TeacherAssignment',
     include: [
-        { model: Teacher, as: 'Teacher' },
+        // Nom de l'enseignant inclus : un enseignant qui consulte l'emploi du temps
+        // d'une de ses classes y voit aussi les cours de ses collègues, sans avoir
+        // le droit de lire la liste des enseignants.
+        { model: Teacher, as: 'Teacher', include: [{ model: User, as: 'User', attributes: ['first_name', 'last_name'] }] },
         { model: Class, as: 'Class' },
         { model: Subject, as: 'Subject' }
     ]

@@ -16,6 +16,15 @@ router.get('/',
     teacherController.listTeachers
 )
 
+// Espace de l'enseignant connecté (ses classes, matières, périodes, élèves).
+// Même permission que la consultation des évaluations, que tout TEACHER a ;
+// déclarée avant '/:id' pour ne pas être capturée comme un identifiant.
+router.get('/me/classes',
+    authenticate,
+    authorize(permissions.ASSESSMENTS_VIEW),
+    teacherController.getMyClasses
+)
+
 router.get('/:id',
     authenticate,
     authorize(permissions.TEACHERS_VIEW),

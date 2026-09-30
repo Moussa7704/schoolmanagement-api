@@ -75,6 +75,22 @@
 
 /**
  * @swagger
+ * /teachers/me/classes:
+ *   get:
+ *     summary: Espace de l'enseignant connecté
+ *     description: Uniquement ses affectations (classe + matière), les périodes de leurs années scolaires et les élèves inscrits (actifs ou redoublants) dans ses classes. Utilisé par les pages Évaluations et Notes à la place des listes générales, qu'un TEACHER n'a pas le droit de lire.
+ *     tags: [Enseignants]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ teacher, assignments, classes, subjects, periods, students, enrollments }"
+ *       403:
+ *         description: Le compte connecté n'est pas un enseignant
+ */
+
+/**
+ * @swagger
  * /teachers/{id}:
  *   get:
  *     summary: Détail d'un enseignant

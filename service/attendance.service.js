@@ -92,11 +92,12 @@ class AttendanceService extends BaseService {
             throw new HttpError("Élève introuvable", 404);
         }
 
+        // Un redoublant (REPEATING) est dans la classe comme un élève actif.
         const enrollment = await Enrollment.findOne({
-            where: { student_id, class_id, status: 'ACTIVE' }
+            where: { student_id, class_id, status: ['ACTIVE', 'REPEATING'] }
         });
         if (!enrollment) {
-            throw new HttpError("Cet élève n'est pas inscrit activement dans cette classe.", 400);
+            throw new HttpError("Cet élève n'est pas inscrit dans cette classe.", 400);
         }
 
         const existing = await this.model.findOne({ where: { student_id, class_id, date, session } });
@@ -198,10 +199,10 @@ class AttendanceService extends BaseService {
         }
 
         const enrollment = await Enrollment.findOne({
-            where: { student_id, academic_year_id: period.academic_year_id, status: 'ACTIVE' }
+            where: { student_id, academic_year_id: period.academic_year_id, status: ['ACTIVE', 'REPEATING'] }
         });
         if (!enrollment) {
-            throw new HttpError("Aucune inscription active pour cet élève sur cette année scolaire.", 400);
+            throw new HttpError("Aucune inscription pour cet élève sur cette année scolaire.", 400);
         }
 
         const attendances = await this.model.findAll({

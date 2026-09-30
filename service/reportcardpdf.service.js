@@ -207,6 +207,19 @@ function drawBulletin(doc, { data, student, classRecord, period, academicYear, s
     return y + 16 + 70;
 }
 
+// Dessine le bulletin sans saut de page automatique : quand il est réduit
+// (scale), ses coordonnées internes dépassent le bas de la page alors qu'il
+// y tient visuellement, et pdfkit ouvrirait sinon des pages vides en série.
+function drawWithoutAutoPaging(doc, context) {
+    const bottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = -1e6;
+    try {
+        return drawBulletin(doc, context);
+    } finally {
+        doc.page.margins.bottom = bottom;
+    }
+}
+
 // Hauteur qu'occupe un bulletin, mesurée en le dessinant sur un document
 // jetable (jamais écrit) : sert à choisir l'échelle qui le fait tenir en A5.
 function measureBulletin(context) {
@@ -248,10 +261,18 @@ class ReportCardPdfService {
         // getById porte le contrôle d'accès (école, parent) et tous les calculs.
         const context = await this._context(await reportCardService.getById(id, currentUser));
 
-        const buffer = await renderPdf({ size: "A4", margin: MARGIN }, (doc) => {
+        // Marge gérée à la main (translate) : avec une marge pdfkit, un texte
+        // dessiné sous la marge basse déclencherait des pages supplémentaires.
+        const buffer = await renderPdf({ size: "A4", margin: 0 }, (doc) => {
+            // Toujours une seule page : au-delà d'environ 17 matières, le bulletin
+            // est réduit juste assez pour tenir (jamais agrandi).
+            const available = doc.page.height - MARGIN * 2;
+            const scale = Math.min(1, available / measureBulletin(context));
+            const offsetX = MARGIN + (BULLETIN_WIDTH - BULLETIN_WIDTH * scale) / 2;
             doc.save();
-            doc.translate(MARGIN, MARGIN);
-            drawBulletin(doc, context);
+            doc.translate(offsetX, MARGIN);
+            doc.scale(scale);
+            drawWithoutAutoPaging(doc, context);
             doc.restore();
         });
 
@@ -287,7 +308,7 @@ class ReportCardPdfService {
                 doc.save();
                 doc.translate(originX, HALF_MARGIN);
                 doc.scale(scale);
-                drawBulletin(doc, context);
+                drawWithoutAutoPaging(doc, context);
                 doc.restore();
 
                 // Trait de découpe entre les deux bulletins d'une même feuille.
