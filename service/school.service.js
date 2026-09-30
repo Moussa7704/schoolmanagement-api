@@ -8,7 +8,7 @@ class SchoolService extends BaseService {
     }
 
     async create(data) {
-        const { name, address, phone, email } = data;
+        const { name, address, phone, email, academy } = data;
 
         if (!name) {
             throw new HttpError("Le nom de l'école est requis.", 400);
@@ -19,7 +19,7 @@ class SchoolService extends BaseService {
             throw new HttpError("Une école possède déjà ce nom.", 400);
         }
 
-        return super.create({ name, address, phone, email });
+        return super.create({ name, address, phone, email, academy });
     }
 
     async list() {
@@ -37,7 +37,7 @@ class SchoolService extends BaseService {
     async update(id, data) {
         const school = await this.getById(id);
 
-        const { name, address, phone, email } = data;
+        const { name, address, phone, email, academy } = data;
 
         if (name && name !== school.name) {
             const existing = await this.model.findOne({ where: { name } });
@@ -50,7 +50,8 @@ class SchoolService extends BaseService {
             name: name ?? school.name,
             address: address ?? school.address,
             phone: phone ?? school.phone,
-            email: email ?? school.email
+            email: email ?? school.email,
+            academy: academy ?? school.academy
         });
 
         return school;

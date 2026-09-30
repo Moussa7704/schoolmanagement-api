@@ -35,6 +35,10 @@
  *               email:
  *                 type: string
  *                 example: contact@lumieres.edu
+ *               academy:
+ *                 type: string
+ *                 description: Académie d'enseignement, imprimée dans l'en-tête des bulletins
+ *                 example: Académie d'Enseignement de Bamako Rive Droite
  *     responses:
  *       201:
  *         description: École créée

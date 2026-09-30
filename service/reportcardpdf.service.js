@@ -85,12 +85,38 @@ function checklist(doc, x, y, width, labels, selected) {
 // Dessine un bulletin complet dans le repère courant, coin haut-gauche en
 // (0, 0), sur BULLETIN_WIDTH de large. Renvoie la hauteur utilisée.
 function drawBulletin(doc, { data, student, classRecord, period, academicYear, school, enrollment }) {
-    let y = 0;
+    // En-tête officiel : ministère, académie et école à gauche ; République,
+    // devise et téléphone de l'école à droite. Les lignes absentes (académie
+    // ou téléphone non renseignés) sont simplement omises.
+    const columnWidth = 230;
+    const leftLines = [
+        { text: "MINISTÈRE DE L'ÉDUCATION NATIONALE", font: "Helvetica-Bold", size: 9 },
+        school?.academy && { text: school.academy, font: "Helvetica", size: 9 },
+        { text: school?.name || "Établissement scolaire", font: "Helvetica-Bold", size: 10 }
+    ].filter(Boolean);
+    const rightLines = [
+        { text: "RÉPUBLIQUE DU MALI", font: "Helvetica-Bold", size: 9 },
+        { text: "Un Peuple – Un But – Une Foi", font: "Helvetica-Oblique", size: 8.5 },
+        school?.phone && { text: `Tél : ${school.phone}`, font: "Helvetica", size: 9 }
+    ].filter(Boolean);
+    const headerBlock = (lines, x) => {
+        let lineY = 0;
+        lines.forEach((line, i) => {
+            if (i > 0) {
+                // Petit trait de séparation entre les lignes, comme sur les en-têtes officiels.
+                doc.lineWidth(0.5).strokeColor(COLORS.muted)
+                    .moveTo(x + columnWidth / 2 - 15, lineY + 1).lineTo(x + columnWidth / 2 + 15, lineY + 1).stroke();
+                lineY += 5;
+            }
+            doc.font(line.font).fontSize(line.size).fillColor(COLORS.ink);
+            doc.text(fitText(doc, line.text, columnWidth), x, lineY, { width: columnWidth, align: "center", lineBreak: false });
+            lineY += line.size + 4;
+        });
+        return lineY;
+    };
+    let y = Math.max(headerBlock(leftLines, 0), headerBlock(rightLines, BULLETIN_WIDTH - columnWidth));
 
-    // En-tête de l'établissement.
-    y = centered(doc, school?.name || "Établissement scolaire", y, { font: "Helvetica-Bold", size: 14 });
-    if (school?.address) y = centered(doc, school.address, y, { size: 9, color: COLORS.muted });
-    y += 6;
+    y += 10;
     y = centered(doc, `BULLETIN DE NOTES — ${period?.label || ""}`.trim(), y, { font: "Helvetica-Bold", size: 13 });
     y = centered(doc, `Année scolaire : ${academicYear?.label || "-"}`, y, { size: 10 });
 
