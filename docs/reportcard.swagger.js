@@ -118,6 +118,76 @@
 
 /**
  * @swagger
+ * /report-cards/class-pdf:
+ *   get:
+ *     summary: Imprimer tous les bulletins d'une classe (deux par feuille A4)
+ *     description: Bulletins déjà créés pour la classe et la période, triés par nom d'élève. A4 paysage, un bulletin réduit sur chaque moitié, trait de découpe au milieu. Interdit aux parents.
+ *     tags: [Bulletins]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: class_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: period_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Fichier PDF
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: class_id ou period_id manquant
+ *       403:
+ *         description: Accès refusé (autre école, ou parent)
+ *       404:
+ *         description: Classe introuvable, ou aucun bulletin créé pour cette classe sur cette période
+ */
+
+/**
+ * @swagger
+ * /report-cards/{id}/pdf:
+ *   get:
+ *     summary: Télécharger le bulletin (PDF A4)
+ *     description: |
+ *       Bulletin au format malien. Par matière de la classe : Devoir (moyenne simple des devoirs, sur 20),
+ *       Comp (composition), Moy/20 = (Devoir + Comp × 2) / 3, Coeff, Moy Gen = Moy/20 × Coeff, appréciation.
+ *       Ligne TOTAL (coefficients, Moy Gen), moyenne /20 = total Moy Gen / total coefficients, rang,
+ *       retards et absences de la période (en demi-journées), appréciation du travail et distinction
+ *       cochées automatiquement selon la moyenne (règles dans constants/grading.js).
+ *     tags: [Bulletins]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Fichier PDF
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Bulletin introuvable
+ */
+
+/**
+ * @swagger
  * /report-cards/{id}/validate:
  *   patch:
  *     summary: Valider un bulletin (DRAFT → VALIDATED)

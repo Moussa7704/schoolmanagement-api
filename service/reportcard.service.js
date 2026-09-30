@@ -1,11 +1,15 @@
 const {
     ReportCard, Student, Period, AcademicYear, Class, Enrollment,
-    Grade, Assessment, TeacherAssignment, Subject
+    Grade, Assessment, TeacherAssignment, Subject, Attendance
 } = require("../models")
+const { Op } = require("sequelize");
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
 const { isParent, getChildStudentIds, assertParentCanAccessStudent } = require("../utils/parentAccess");
+const {
+    DEVOIR_WEIGHT, COMPOSITION_WEIGHT, subjectAppreciation, workAppreciation, distinction
+} = require("../constants/grading");
 
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
 
@@ -155,7 +159,21 @@ class ReportCardService extends BaseService {
         return this._findWithAccess(id, currentUser);
     }
 
+    // Calcul malien, par matière enseignée dans la classe :
+    //   Devoir  = moyenne simple des devoirs (somme / nombre), ramenés sur 20
+    //   Comp    = note de composition (EXAMEN), ramenée sur 20
+    //   Moy/20  = (Devoir × poids + Comp × poids) / somme des poids (constants/grading.js)
+    //   Moy Gen = Moy/20 × coefficient de la matière
+    // Moyenne générale = Σ Moy Gen / Σ coefficients des matières notées. Les
+    // valeurs intermédiaires ne sont pas arrondies : seul l'affichage l'est,
+    // comme sur les bulletins papier (280 / 27 affiché 10,38 et non 10,37).
     async _computeAverages(studentId, classId, periodId) {
+        const assignments = await TeacherAssignment.findAll({
+            where: { class_id: classId },
+            include: [{ model: Subject, as: 'Subject' }],
+            order: [["id", "ASC"]]
+        });
+
         const grades = await Grade.findAll({
             where: { student_id: studentId },
             include: [{
@@ -171,45 +189,75 @@ class ReportCardService extends BaseService {
             }]
         });
 
+        // Toutes les matières de la classe apparaissent, même sans note encore
+        // (lignes vides sur le bulletin, exclues des totaux).
         const bySubject = new Map();
-        for (const grade of grades) {
-            const assessment = grade.Assessment;
-            const subject = assessment.TeacherAssignment.Subject;
-            const normalized = (grade.score / assessment.max_score) * 20;
-            const weight = assessment.coefficient;
-
+        const ensureSubject = (subject) => {
             if (!bySubject.has(subject.id)) {
                 bySubject.set(subject.id, {
                     subject_id: subject.id,
                     subject_name: subject.name,
                     coefficient: subject.coefficient_default,
-                    weightedSum: 0,
-                    weightTotal: 0
+                    devoirs: [],
+                    compositions: []
                 });
             }
-            const entry = bySubject.get(subject.id);
-            entry.weightedSum += normalized * weight;
-            entry.weightTotal += weight;
+            return bySubject.get(subject.id);
+        };
+        for (const assignment of assignments) {
+            if (assignment.Subject) ensureSubject(assignment.Subject);
         }
 
-        const subjects = Array.from(bySubject.values()).map((s) => ({
-            subject_id: s.subject_id,
-            subject_name: s.subject_name,
-            coefficient: s.coefficient,
-            average: s.weightTotal ? Number((s.weightedSum / s.weightTotal).toFixed(2)) : null
-        }));
+        for (const grade of grades) {
+            const assessment = grade.Assessment;
+            const entry = ensureSubject(assessment.TeacherAssignment.Subject);
+            const normalized = (grade.score / assessment.max_score) * 20;
+            (assessment.type === 'EXAMEN' ? entry.compositions : entry.devoirs).push(normalized);
+        }
 
-        // Moyenne générale pondérée par le coefficient de chaque matière (pas une
-        // simple moyenne des moyennes) — c'est tout l'intérêt d'avoir un coefficient.
-        const gradedSubjects = subjects.filter((s) => s.average !== null);
-        const overallWeightTotal = gradedSubjects.reduce((sum, s) => sum + s.coefficient, 0);
-        const overall_average = overallWeightTotal
-            ? Number(
-                (gradedSubjects.reduce((sum, s) => sum + s.average * s.coefficient, 0) / overallWeightTotal).toFixed(2)
-            )
-            : null;
+        const mean = (values) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
+        const round2 = (value) => (value === null ? null : Number(value.toFixed(2)));
 
-        return { subjects, overall_average };
+        let totalCoefficient = 0;
+        let totalWeighted = 0;
+        const subjects = Array.from(bySubject.values()).map((s) => {
+            const devoir = mean(s.devoirs);
+            const composition = mean(s.compositions);
+
+            let average = null;
+            if (devoir !== null && composition !== null) {
+                average = (devoir * DEVOIR_WEIGHT + composition * COMPOSITION_WEIGHT) / (DEVOIR_WEIGHT + COMPOSITION_WEIGHT);
+            } else {
+                average = devoir ?? composition;
+            }
+
+            const weighted = average === null ? null : average * s.coefficient;
+            if (weighted !== null) {
+                totalCoefficient += s.coefficient;
+                totalWeighted += weighted;
+            }
+
+            return {
+                subject_id: s.subject_id,
+                subject_name: s.subject_name,
+                coefficient: s.coefficient,
+                devoir_average: round2(devoir),
+                devoir_count: s.devoirs.length,
+                composition_average: round2(composition),
+                average: round2(average),
+                weighted_average: round2(weighted),
+                appreciation: subjectAppreciation(average)
+            };
+        });
+
+        const overall_average = totalCoefficient ? round2(totalWeighted / totalCoefficient) : null;
+
+        return {
+            subjects,
+            overall_average,
+            total_coefficient: totalCoefficient,
+            total_weighted: round2(totalWeighted)
+        };
     }
 
     async _rankClass(classId, periodId, currentUser) {
@@ -268,23 +316,76 @@ class ReportCardService extends BaseService {
 
     async getById(id, currentUser) {
         const reportCard = await this._findReadable(id, currentUser);
+        const classRanking = await this._rankClass(reportCard.class_id, reportCard.period_id, currentUser);
+        return this._buildDetail(reportCard, classRanking);
+    }
 
-        const { subjects, overall_average } = await this._computeAverages(
+    // Tous les bulletins d'une classe pour une période (impression groupée),
+    // triés par nom d'élève. Le classement n'est calculé qu'une fois pour tous.
+    async getClassDetails(classId, periodId, currentUser) {
+        if (!classId || !periodId) {
+            throw new HttpError("class_id et period_id sont requis.", 400);
+        }
+        // Un parent ne peut pas imprimer les bulletins des autres élèves.
+        if (isParent(currentUser)) {
+            throw new HttpError("Accès refusé", 403);
+        }
+
+        const classRanking = await this._rankClass(Number(classId), Number(periodId), currentUser);
+        const reportCards = await this.model.findAll({
+            where: { class_id: classId, period_id: periodId },
+            include: [{ model: Student, as: "Student" }]
+        });
+        if (reportCards.length === 0) {
+            throw new HttpError("Aucun bulletin n'a encore été créé pour cette classe sur cette période.", 404);
+        }
+
+        reportCards.sort((a, b) =>
+            `${a.Student?.last_name} ${a.Student?.first_name}`.localeCompare(`${b.Student?.last_name} ${b.Student?.first_name}`, "fr"));
+
+        const details = [];
+        for (const reportCard of reportCards) {
+            details.push(await this._buildDetail(reportCard, classRanking));
+        }
+        return details;
+    }
+
+    async _buildDetail(reportCard, { ranking, total_students }) {
+        const { subjects, overall_average, total_coefficient, total_weighted } = await this._computeAverages(
             reportCard.student_id, reportCard.class_id, reportCard.period_id
         );
-
-        const { ranking, total_students } = await this._rankClass(
-            reportCard.class_id, reportCard.period_id, currentUser
-        );
         const rankEntry = ranking.find((e) => e.student_id === reportCard.student_id);
+
+        const { late_count, absence_count } = await this._attendanceCounts(reportCard);
 
         return {
             ...reportCard.toJSON(),
             subjects,
             overall_average,
+            total_coefficient,
+            total_weighted,
             rank: rankEntry ? rankEntry.rank : null,
-            total_students
+            total_students,
+            late_count,
+            absence_count,
+            work_appreciation: workAppreciation(overall_average),
+            distinction: distinction(overall_average)
         };
+    }
+
+    // Retards et absences de l'élève sur la période, comptés en demi-journées
+    // (une ligne de présence = une matinée ou un après-midi), justifiés compris.
+    async _attendanceCounts(reportCard) {
+        const period = await Period.findByPk(reportCard.period_id);
+        const where = { student_id: reportCard.student_id, class_id: reportCard.class_id };
+        if (period?.start_date && period?.end_date) {
+            where.date = { [Op.between]: [period.start_date, period.end_date] };
+        }
+        const [late_count, absence_count] = await Promise.all([
+            Attendance.count({ where: { ...where, status: 'LATE' } }),
+            Attendance.count({ where: { ...where, status: 'ABSENT' } })
+        ]);
+        return { late_count, absence_count };
     }
 
     async validate(id, currentUser) {

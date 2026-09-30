@@ -1,4 +1,5 @@
 const reportCardService = require("../service/reportcard.service")
+const reportCardPdfService = require("../service/reportcardpdf.service")
 const { sendResponse } = require("../utils/message")
 
 const createReportCard = async (req, res) => {
@@ -109,11 +110,55 @@ const deleteReportCard = async (req, res) => {
     }
 };
 
+const downloadReportCardPdf = async (req, res) => {
+    try {
+        const { buffer, filename } = await reportCardPdfService.generate(req.params.id, req.user);
+
+        res.set({
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${filename}"`,
+            "Content-Length": buffer.length
+        });
+        return res.status(200).send(buffer);
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 500
+        });
+    }
+};
+
+const downloadClassReportCardsPdf = async (req, res) => {
+    try {
+        const { buffer, filename } = await reportCardPdfService.generateForClass(
+            req.query.class_id, req.query.period_id, req.user
+        );
+
+        res.set({
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${filename}"`,
+            "Content-Length": buffer.length
+        });
+        return res.status(200).send(buffer);
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 500
+        });
+    }
+};
+
 module.exports = {
     createReportCard,
     listReportCards,
     getReportCardById,
     getClassRanking,
     validateReportCard,
-    deleteReportCard
+    deleteReportCard,
+    downloadReportCardPdf,
+    downloadClassReportCardsPdf
 }

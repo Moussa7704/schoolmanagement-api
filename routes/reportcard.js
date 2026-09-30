@@ -22,10 +22,25 @@ router.get('/ranking',
     reportCardController.getClassRanking
 )
 
+// Bulletins d'une classe pour une période, deux par feuille A4 (à découper).
+// Déclarée avant '/:id' pour ne pas être capturée comme un identifiant.
+router.get('/class-pdf',
+    authenticate,
+    authorize(permissions.REPORT_CARDS_VIEW),
+    reportCardController.downloadClassReportCardsPdf
+)
+
 router.get('/:id',
     authenticate,
     authorize(permissions.REPORT_CARDS_VIEW),
     reportCardController.getReportCardById
+)
+
+// Bulletin imprimable (PDF A4), même accès que la consultation du bulletin.
+router.get('/:id/pdf',
+    authenticate,
+    authorize(permissions.REPORT_CARDS_VIEW),
+    reportCardController.downloadReportCardPdf
 )
 
 router.patch('/:id/validate',
