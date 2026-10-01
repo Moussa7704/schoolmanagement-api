@@ -56,6 +56,10 @@ app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec,
     }
 ));
 
+// Filtres de liste (?class_id=…, ?student_id=…) : entiers positifs uniquement.
+const { validateQueryIds } = require("./middlewares/validate")
+app.use('/api/v1', validateQueryIds)
+
 // Routes
 const authRoutes = require("./routes/auth")
 const userRoutes = require("./routes/user")

@@ -1,5 +1,9 @@
 const express = require("express")
 const router = express.Router()
+const { validateIdParam } = require("../middlewares/validate")
+
+// Tout « :id » de ces adresses doit être un entier positif (sinon 400).
+router.param('id', validateIdParam)
 const permissions = require("../constants/permissions")
 const periodController = require("../controllers/period.controller")
 const { authenticate, authorize } = require("../middlewares/auth")

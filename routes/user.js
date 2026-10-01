@@ -1,5 +1,10 @@
 const express = require("express")
 const router = express.Router()
+const { validate, validateIdParam } = require("../middlewares/validate")
+const authSchemas = require("../validators/auth")
+
+// Tout « :id » de ces adresses doit être un entier positif (sinon 400).
+router.param('id', validateIdParam)
 const permissions = require("../constants/permissions")
 const userController = require("../controllers/user.controller")
 const { authenticate, authorize } = require("../middlewares/auth")
@@ -43,6 +48,7 @@ router.patch('/:id/status',
 router.put('/:id/change-password',
     authenticate,
     authorize(permissions.USERS_CHANGE_PASSWORD),
+    validate(authSchemas.adminChangePassword),
     userController.changePassword
 )
 

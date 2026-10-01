@@ -1,5 +1,10 @@
 const express = require("express")
 const router = express.Router()
+const { validate, validateIdParam } = require("../middlewares/validate")
+const schemas = require("../validators/academic")
+
+// Tout « :id » de ces adresses doit être un entier positif (sinon 400).
+router.param('id', validateIdParam)
 const permissions = require("../constants/permissions")
 const reportCardController = require("../controllers/reportcard.controller")
 const { authenticate, authorize } = require("../middlewares/auth")
@@ -7,6 +12,7 @@ const { authenticate, authorize } = require("../middlewares/auth")
 router.post('/',
     authenticate,
     authorize(permissions.REPORT_CARDS_CREATE),
+    validate(schemas.createReportCard),
     reportCardController.createReportCard
 )
 
@@ -19,6 +25,7 @@ router.get('/',
 router.get('/ranking',
     authenticate,
     authorize(permissions.REPORT_CARDS_VIEW),
+    validate(schemas.classPeriodQuery),
     reportCardController.getClassRanking
 )
 
@@ -27,6 +34,7 @@ router.get('/ranking',
 router.get('/class-pdf',
     authenticate,
     authorize(permissions.REPORT_CARDS_VIEW),
+    validate(schemas.classPeriodQuery),
     reportCardController.downloadClassReportCardsPdf
 )
 
