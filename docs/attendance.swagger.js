@@ -58,6 +58,56 @@
 
 /**
  * @swagger
+ * /attendances/roll-call:
+ *   post:
+ *     summary: Faire l'appel d'une classe (toutes les présences d'une date et d'une séance)
+ *     description: "Enregistre en une fois le statut de chaque élève. Une présence déjà saisie pour ce créneau est mise à jour au lieu d'être dupliquée (correction de l'appel, qui demande aussi attendances.update). Tout ou rien : un élève non inscrit dans la classe annule l'ensemble. Un TEACHER ne peut faire l'appel que dans ses propres classes."
+ *     tags: [Présences]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [class_id, date, session, entries]
+ *             properties:
+ *               class_id:
+ *                 type: integer
+ *               date:
+ *                 type: string
+ *                 format: date
+ *               session:
+ *                 type: string
+ *                 enum: [MORNING, AFTERNOON]
+ *               entries:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [student_id]
+ *                   properties:
+ *                     student_id:
+ *                       type: integer
+ *                     status:
+ *                       type: string
+ *                       enum: [PRESENT, ABSENT, LATE]
+ *                       default: PRESENT
+ *                     justified:
+ *                       type: boolean
+ *                     reason:
+ *                       type: string
+ *     responses:
+ *       201:
+ *         description: "Appel enregistré { created, updated, attendances }"
+ *       400:
+ *         description: Données invalides ou élève non inscrit dans la classe
+ *       403:
+ *         description: Classe hors de portée, ou correction d'un appel sans attendances.update
+ */
+
+/**
+ * @swagger
  * /attendances/stats:
  *   get:
  *     summary: Taux d'absentéisme d'un élève sur une période
