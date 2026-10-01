@@ -12,11 +12,12 @@ const refreshCookieOptions = {
 
 const login = async (req, res) => {
     try {
-        const { user, expiresAt } = await authService.login(req.body.email, req.body.password);
+        const { user, expiresAt, otpToken } = await authService.login(req.body.email, req.body.password);
 
         return res.status(200).json({
-            message: "Veuillez verifier le code a 6 chiffre qui vous ete envoie votre adresse email ",
-            user_id: user.id,
+            message: "Veuillez saisir le code à 6 chiffres envoyé à votre adresse e-mail.",
+            // Jeton temporaire à renvoyer avec le code (remplace l'ancien user_id).
+            otp_token: otpToken,
             email: user.email,
             expires_at: expiresAt
         });
@@ -30,7 +31,7 @@ const login = async (req, res) => {
 
 const verifyOtp = async (req, res) => {
     try {
-        const { accessToken, refreshToken } = await authService.verifyOtp(req.body.user_id, req.body.code);
+        const { accessToken, refreshToken } = await authService.verifyOtp(req.body.otp_token, req.body.code);
 
         res.cookie("refreshToken", refreshToken, refreshCookieOptions);
 
@@ -138,8 +139,9 @@ const forgetPassword = async (req, res) => {
     try {
         await authService.forgotPassword(req.body.email);
 
+        // Même message que l'adresse ait un compte ou non.
         return res.json({
-            message: "Email de réinitialisation a été envoyé. Veuillez vérifier votre boîte de réception.",
+            message: "Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d'être envoyé.",
         });
     } catch (err) {
         if (err.status) {
@@ -166,10 +168,11 @@ const resetPassword = async (req, res) => {
 
 const resendOtp = async (req, res) => {
     try {
-        await authService.resendOtp(req.body.user_id);
+        const expiresAt = await authService.resendOtp(req.body.otp_token);
 
         return res.json({
-            message: "OTP renvoyé avec succès"
+            message: "Un nouveau code vous a été envoyé.",
+            expires_at: expiresAt
         });
     } catch (err) {
         if (err.status) {

@@ -5,17 +5,71 @@ const crypto = require('crypto');
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const { sendOtpEmail, sendResetEmail } = require('../utils/sendEmail');
-const { generateAccessToken, generateRefreshToken, generateResetToken, verifyRefreshToken } = require("../utils/jwt");
+const {
+    generateAccessToken, generateRefreshToken, generateResetToken, verifyRefreshToken,
+    generateOtpChallengeToken, verifyOtpChallengeToken
+} = require("../utils/jwt");
 
 const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Règles des codes de connexion (OTP).
+const OTP_TYPE = "LOGIN";                 // seul type accepté pour se connecter
+const OTP_TTL_MS = 10 * 60 * 1000;        // validité d'un code
+const OTP_MAX_ATTEMPTS = 5;               // mauvais codes avant invalidation
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000; // délai minimum entre deux envois
+const OTP_MAX_SENDS = 5;                  // envois max pour une même connexion
+
+// Message unique pour tout jeton de connexion absent, expiré ou falsifié.
+const CHALLENGE_ERROR = "Session de connexion expirée. Veuillez vous reconnecter.";
 
 class AuthService extends BaseService {
     constructor() {
         super(User);
     }
 
+    // Générateur cryptographique (Math.random() n'est pas fait pour la sécurité).
     _generateOtpCode() {
-        return Math.floor(100000 + Math.random() * 900000).toString();
+        return crypto.randomInt(100000, 1000000).toString();
+    }
+
+    // Le code n'est jamais stocké en clair : HMAC avec une clé serveur, lié à
+    // l'utilisateur (un même code chez deux utilisateurs donne deux empreintes).
+    _hashOtpCode(userId, code) {
+        return crypto
+            .createHmac("sha256", `${process.env.ACCESS_SECRET}::otp`)
+            .update(`${userId}:${code}`)
+            .digest("hex");
+    }
+
+    _userIdFromChallenge(otpToken) {
+        if (!otpToken) {
+            throw new HttpError(CHALLENGE_ERROR, 401);
+        }
+        try {
+            return verifyOtpChallengeToken(otpToken).id;
+        } catch (err) {
+            throw new HttpError(CHALLENGE_ERROR, 401);
+        }
+    }
+
+    // Crée le code d'une connexion, après avoir supprimé tous les précédents :
+    // un seul code valable à la fois par utilisateur.
+    async _issueLoginOtp(user, sendCount = 1) {
+        await Otp.destroy({ where: { user_id: user.id } });
+
+        const code = this._generateOtpCode();
+        const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+        await Otp.create({
+            user_id: user.id,
+            code: this._hashOtpCode(user.id, code),
+            type: OTP_TYPE,
+            expires_at: expiresAt,
+            attempts: 0,
+            send_count: sendCount
+        });
+
+        await sendOtpEmail(user.email, code);
+        return expiresAt;
     }
 
     async _issueTokens(user) {
@@ -48,60 +102,86 @@ class AuthService extends BaseService {
         if (!validPassword) {
             throw new HttpError("votre addresse email ou mot de passe est incorrect", 400);
         }
+        // Inutile d'envoyer un code à un compte qui ne pourra pas se connecter.
+        if (user.status !== "active") {
+            throw new HttpError("Ce compte est désactivé. Contactez l'administration de l'école.", 403);
+        }
 
-        const code = this._generateOtpCode();
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+        const expiresAt = await this._issueLoginOtp(user);
 
-        await Otp.create({
-            user_id: user.id,
-            code,
-            type: "LOGIN",
-            expires_at: expiresAt
-        });
-
-        await sendOtpEmail(user.email, code);
-
-        return { user, expiresAt };
+        // Le client garde ce jeton (et non l'identifiant de l'utilisateur) pour
+        // vérifier ou renvoyer le code.
+        return { user, expiresAt, otpToken: generateOtpChallengeToken(user.id) };
     }
 
-    async verifyOtp(user_id, code) {
-        const otp = await Otp.findOne({ where: { user_id, code } });
+    async verifyOtp(otpToken, code) {
+        const userId = this._userIdFromChallenge(otpToken);
 
-        if (!otp) {
-            throw new HttpError("Otp invalide", 400);
-        }
-        if (new Date() > otp.expires_at) {
-            throw new HttpError("OTP expiré", 400);
+        if (!code || !/^\d{6}$/.test(String(code))) {
+            throw new HttpError("Le code doit contenir 6 chiffres.", 400);
         }
 
-        const user = await this.model.findByPk(otp.user_id, { include: ['Role'] });
-        if (!user) {
-            throw new HttpError("Utilisateur non trouvé", 400);
+        // Un code expiré ou épuisé n'est pas supprimé ici : il est conservé pour
+        // que le renvoi applique toujours son délai et son compteur d'envois
+        // (sinon 5 essais → renvoi immédiat → 5 essais… sans fin).
+        const otp = await Otp.findOne({ where: { user_id: userId, type: OTP_TYPE } });
+        if (!otp || new Date() > otp.expires_at) {
+            throw new HttpError("Code expiré. Demandez un nouveau code.", 400);
+        }
+        if (otp.attempts >= OTP_MAX_ATTEMPTS) {
+            throw new HttpError("Trop de codes incorrects. Demandez un nouveau code ou reconnectez-vous.", 429);
         }
 
-        const tokens = await this._issueTokens(user);
+        // Comparaison en temps constant des deux empreintes.
+        const expected = Buffer.from(otp.code, "hex");
+        const received = Buffer.from(this._hashOtpCode(userId, String(code)), "hex");
+        const matches = expected.length === received.length && crypto.timingSafeEqual(expected, received);
+
+        if (!matches) {
+            const attempts = otp.attempts + 1;
+            await otp.update({ attempts });
+            if (attempts >= OTP_MAX_ATTEMPTS) {
+                // Trop d'essais : le code est bloqué (même le bon ne passera plus).
+                throw new HttpError("Trop de codes incorrects. Demandez un nouveau code ou reconnectez-vous.", 429);
+            }
+            throw new HttpError(`Code incorrect. Il vous reste ${OTP_MAX_ATTEMPTS - attempts} essai(s).`, 400);
+        }
+
+        const user = await this.model.findByPk(userId, { include: ['Role'] });
+        if (!user || user.status !== "active") {
+            await otp.destroy();
+            throw new HttpError(CHALLENGE_ERROR, 401);
+        }
+
+        // Code à usage unique : détruit avant d'émettre les jetons.
         await otp.destroy();
+        const tokens = await this._issueTokens(user);
 
         return { user, ...tokens };
     }
 
-    async resendOtp(user_id) {
-        const user = await this.model.findByPk(user_id);
-        if (!user) {
-            throw new HttpError("Utilisateur non trouvé", 400);
+    async resendOtp(otpToken) {
+        const userId = this._userIdFromChallenge(otpToken);
+
+        const user = await this.model.findByPk(userId);
+        if (!user || user.status !== "active") {
+            throw new HttpError(CHALLENGE_ERROR, 401);
         }
 
-        await Otp.destroy({ where: { user_id } });
+        const current = await Otp.findOne({ where: { user_id: userId, type: OTP_TYPE } });
+        if (current) {
+            const waitMs = current.createdAt.getTime() + OTP_RESEND_COOLDOWN_MS - Date.now();
+            if (waitMs > 0) {
+                throw new HttpError(`Veuillez patienter ${Math.ceil(waitMs / 1000)} seconde(s) avant de redemander un code.`, 429);
+            }
+            if (current.send_count >= OTP_MAX_SENDS) {
+                throw new HttpError("Trop de codes demandés. Veuillez vous reconnecter.", 429);
+            }
+        }
 
-        const code = this._generateOtpCode();
-        await Otp.create({
-            user_id,
-            type: "RESEND_OTP",
-            code,
-            expires_at: new Date(Date.now() + 10 * 60 * 1000)
-        });
-
-        await sendOtpEmail(user.email, code);
+        // Le compteur d'envois suit la même connexion ; il repart à 1 seulement
+        // après une nouvelle saisie du mot de passe (login).
+        return this._issueLoginOtp(user, (current?.send_count ?? 0) + 1);
     }
 
     async refresh(refreshTokenValue) {
@@ -218,8 +298,10 @@ class AuthService extends BaseService {
 
     async forgotPassword(email) {
         const user = await this.model.findOne({ where: { email } });
+        // Même réponse que l'adresse existe ou non : ne pas révéler quels
+        // e-mails ont un compte.
         if (!user) {
-            throw new HttpError("Aucun utilisateur trouvé avec cette adresse email", 404);
+            return;
         }
 
         await PasswordReset.destroy({ where: { user_id: user.id } });

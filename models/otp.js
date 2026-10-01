@@ -20,7 +20,19 @@ module.exports = (sequelize, DataTypes) => {
     code: DataTypes.STRING,
     type: DataTypes.STRING,
     expires_at: DataTypes.DATE,
-    is_used: DataTypes.BOOLEAN
+    is_used: DataTypes.BOOLEAN,
+    // Mauvais codes saisis : le code est invalidé au-delà de la limite.
+    attempts: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
+    },
+    // Envois pour la même tentative de connexion (limite des renvois).
+    send_count: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1
+    }
   }, {
     sequelize,
     modelName: 'Otp',
