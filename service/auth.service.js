@@ -1,4 +1,5 @@
-const { User, Otp, RefreshToken, PasswordReset, Role, Permission, School } = require("../models")
+const { User, Otp, RefreshToken, PasswordReset, Role, Permission, School, sequelize } = require("../models")
+const { Op } = require("sequelize");
 const bcrypt = require("bcrypt")
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -72,7 +73,9 @@ class AuthService extends BaseService {
         return expiresAt;
     }
 
-    async _issueTokens(user) {
+    // `transaction` (facultatif) : permet d'émettre le nouveau jeton dans la même
+    // transaction que la révocation de l'ancien (rotation atomique, voir refresh).
+    async _issueTokens(user, transaction = undefined) {
         const data = {
             id: user.id,
             role: user.Role?.name,
@@ -82,13 +85,27 @@ class AuthService extends BaseService {
         const accessToken = generateAccessToken(data);
         const refreshToken = generateRefreshToken(data);
 
-        await RefreshToken.create({
-            user_id: user.id,
-            token: refreshToken,
-            expires_at: new Date(Date.now() + REFRESH_TOKEN_MAX_AGE_MS)
+        // Jetons révoqués ou expirés de l'utilisateur : inutiles, on fait le ménage.
+        await RefreshToken.destroy({
+            where: {
+                user_id: user.id,
+                [Op.or]: [{ revoked: true }, { expires_at: { [Op.lt]: new Date() } }]
+            },
+            transaction
         });
 
+        // Seul le hash est stocké : une fuite de la base ne donne aucun jeton utilisable.
+        await RefreshToken.create({
+            user_id: user.id,
+            token: this._hashRefreshToken(refreshToken),
+            expires_at: new Date(Date.now() + REFRESH_TOKEN_MAX_AGE_MS)
+        }, { transaction });
+
         return { accessToken, refreshToken };
+    }
+
+    _hashRefreshToken(token) {
+        return crypto.createHash("sha256").update(token).digest("hex");
     }
 
     async login(email, password) {
@@ -189,40 +206,55 @@ class AuthService extends BaseService {
             throw new HttpError("No token", 401);
         }
 
-        const token = await RefreshToken.findOne({
-            where: { token: refreshTokenValue, revoked: false }
-        });
-
-        if (!token) {
-            throw new HttpError("Invalid refresh token", 403);
-        }
-
-        if (new Date() > token.expires_at) {
-            throw new HttpError("Token expired", 403);
-        }
-
-        // Peut lever une erreur (signature invalide/expirée) : volontairement non
-        // convertie en HttpError, pour retomber sur le message générique du controller.
+        // Signature et expiration du JWT d'abord : un jeton falsifié ne touche
+        // jamais la base. Erreur volontairement non convertie en HttpError, pour
+        // retomber sur le message générique du controller.
         const decoded = verifyRefreshToken(refreshTokenValue);
+        const tokenHash = this._hashRefreshToken(refreshTokenValue);
 
-        // Rotation : ce refresh token ne peut servir qu'une seule fois.
-        token.revoked = true;
-        await token.save();
+        const t = await sequelize.transaction();
+        try {
+            // Rotation atomique : la révocation n'aboutit que si le jeton est encore
+            // valide AU MOMENT de l'écriture (condition évaluée par la base). Deux
+            // requêtes simultanées avec le même jeton : une seule obtient 1 ligne
+            // modifiée, l'autre 0 et est refusée — jamais deux nouveaux jetons.
+            const [revokedCount] = await RefreshToken.update(
+                { revoked: true },
+                {
+                    where: {
+                        token: tokenHash,
+                        user_id: decoded.id,
+                        revoked: false,
+                        expires_at: { [Op.gt]: new Date() }
+                    },
+                    transaction: t
+                }
+            );
+            if (revokedCount !== 1) {
+                throw new HttpError("Session expirée. Veuillez vous reconnecter.", 403);
+            }
 
-        const user = await this.model.findByPk(decoded.id, { include: ['Role'] });
+            const user = await this.model.findByPk(decoded.id, { include: ['Role'], transaction: t });
+            if (!user || user.status !== 'active') {
+                throw new HttpError("Utilisateur introuvable ou inactif", 403);
+            }
 
-        if (!user || user.status !== 'active') {
-            throw new HttpError("Utilisateur introuvable ou inactif", 403);
+            // Nouveau jeton émis dans la même transaction : si quoi que ce soit
+            // échoue, l'ancien jeton n'est pas révoqué pour autant.
+            const tokens = await this._issueTokens(user, t);
+            await t.commit();
+            return tokens;
+        } catch (err) {
+            await t.rollback();
+            throw err;
         }
-
-        return this._issueTokens(user);
     }
 
     async logout(refreshTokenValue) {
         if (refreshTokenValue) {
             await RefreshToken.update(
                 { revoked: true },
-                { where: { token: refreshTokenValue } }
+                { where: { token: this._hashRefreshToken(refreshTokenValue) } }
             );
         }
     }

@@ -1,5 +1,6 @@
 require('dotenv').config()
 const jwt = require('jsonwebtoken')
+const crypto = require('crypto')
 
 const generateAccessToken = (payload) => {
     return jwt.sign(payload, process.env.ACCESS_SECRET, {
@@ -9,7 +10,11 @@ const generateAccessToken = (payload) => {
 
 const generateRefreshToken = (payload) => {
     return jwt.sign(payload, process.env.REFRESH_SECRET, {
-        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d'
+        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+        // Identifiant unique : sans lui, deux jetons émis dans la même seconde
+        // pour le même utilisateur seraient identiques, et l'ancien jeton
+        // resterait valable après la rotation.
+        jwtid: crypto.randomUUID()
     })
 }
 
