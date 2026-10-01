@@ -1,4 +1,5 @@
-const { User, Role, School, Teacher, Student, Guardian } = require("../models")
+const { User, Role, School, Teacher, Student, Guardian, StudentGuardian } = require("../models")
+const { Op } = require("sequelize");
 const bcrypt = require("bcrypt");
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
@@ -75,11 +76,34 @@ class UserService extends BaseService {
         return this.getById(user.id, currentUser);
     }
 
+    // Comptes parents (PARENT) dont au moins un enfant est élève de l'école.
+    // Un parent n'est rattaché à aucune école (school_id vide) : ses enfants
+    // peuvent être dans plusieurs écoles, et chacune doit pouvoir le voir.
+    async _parentUserIdsForSchool(schoolId) {
+        if (!schoolId) return [];
+        const students = await Student.findAll({ where: { school_id: schoolId }, attributes: ["id"] });
+        if (!students.length) return [];
+        const links = await StudentGuardian.findAll({
+            where: { student_id: students.map((s) => s.id) },
+            attributes: ["guardian_id"]
+        });
+        if (!links.length) return [];
+        const guardians = await Guardian.findAll({
+            where: { id: [...new Set(links.map((l) => l.guardian_id))], user_id: { [Op.ne]: null } },
+            attributes: ["user_id"]
+        });
+        return [...new Set(guardians.map((g) => g.user_id))];
+    }
+
     async list(currentUser) {
         const where = {};
 
         if (!isSuperAdmin(currentUser)) {
-            where.school_id = currentUser.school_id;
+            const parentUserIds = await this._parentUserIdsForSchool(currentUser.school_id);
+            where[Op.or] = [
+                { school_id: currentUser.school_id },
+                ...(parentUserIds.length ? [{ id: parentUserIds }] : [])
+            ];
         }
 
         return this.model.findAll({
@@ -101,7 +125,12 @@ class UserService extends BaseService {
         }
 
         if (!isSuperAdmin(currentUser) && user.school_id !== currentUser.school_id) {
-            throw new HttpError("Accès refusé", 403);
+            // Exception : parent sans école d'un élève de cette école (voir _parentUserIdsForSchool).
+            const isParentOfThisSchool = user.school_id === null
+                && (await this._parentUserIdsForSchool(currentUser.school_id)).includes(user.id);
+            if (!isParentOfThisSchool) {
+                throw new HttpError("Accès refusé", 403);
+            }
         }
 
         return user;
