@@ -1,6 +1,7 @@
 const express = require("express")
 const router = express.Router()
-const { validateIdParam } = require("../middlewares/validate")
+const { validate, validateIdParam } = require("../middlewares/validate")
+const schemas = require("../validators/structure")
 
 // Tout « :id » de ces adresses doit être un entier positif (sinon 400).
 router.param('id', validateIdParam)
@@ -11,6 +12,7 @@ const { authenticate, authorize } = require("../middlewares/auth")
 router.post('/',
     authenticate,
     authorize(permissions.CLASSES_CREATE),
+    validate(schemas.createClass),
     classController.createClass
 )
 
@@ -29,12 +31,14 @@ router.get('/:id',
 router.put('/:id',
     authenticate,
     authorize(permissions.CLASSES_UPDATE),
+    validate(schemas.updateClass),
     classController.updateClass
 )
 
 router.post('/:id/promote',
     authenticate,
     authorize(permissions.ENROLLMENTS_CREATE),
+    validate(schemas.promoteClass),
     classController.promoteClass
 )
 

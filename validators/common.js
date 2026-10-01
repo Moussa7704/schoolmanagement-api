@@ -46,4 +46,53 @@ const amount = numeric("doit être un nombre", (n) =>
         .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6, "ne doit pas avoir plus de 2 décimales")
 );
 
-module.exports = { z, id, numeric, email, passwordInput, newPassword, text, date, amount };
+// Valeur parmi une liste fixe (statuts, séances, cycles…).
+const oneOf = (values) =>
+    z.enum(values, {
+        errorMap: () => ({ message: `doit valoir ${values.join(", ")}` })
+    });
+
+const bool = z.boolean({ invalid_type_error: "doit valoir true ou false" });
+
+// --- Champs facultatifs de formulaire -------------------------------------
+// Un champ laissé vide arrive absent, à null ou à "" selon le formulaire.
+
+// Texte libre : "" reste "" (les services s'en servent pour effacer le champ).
+const optionalText = (max) =>
+    z
+        .string({ invalid_type_error: "doit être un texte" })
+        .trim()
+        .max(max, `ne doit pas dépasser ${max} caractères`)
+        .nullable()
+        .optional();
+
+// E-mail facultatif : vide accepté, sinon une adresse valide.
+const optionalEmail = z
+    .string({ invalid_type_error: "doit être un texte" })
+    .trim()
+    .max(254, "est trop long")
+    .refine((value) => value === "" || email.safeParse(value).success, "doit être une adresse e-mail valide")
+    .nullable()
+    .optional();
+
+// Téléphone facultatif : chiffres, espaces, +, -, ., parenthèses.
+const phone = z
+    .string({ invalid_type_error: "doit être un texte" })
+    .trim()
+    .max(30, "ne doit pas dépasser 30 caractères")
+    .regex(/^[0-9+().\s-]*$/, "ne doit contenir que des chiffres, espaces, +, -, . ou parenthèses")
+    .nullable()
+    .optional();
+
+// Date, choix ou nombre facultatif : "" vaut « non renseigné » (null).
+const emptyToNull = (schema) => z.preprocess((value) => (value === "" ? null : value), schema.nullable().optional());
+
+// Heure HH:mm ou HH:mm:ss, et qui existe (pas de 25:00).
+const time = z
+    .string({ required_error: "est requise", invalid_type_error: "doit être une heure (HH:mm)" })
+    .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, "doit être une heure valide au format HH:mm");
+
+module.exports = {
+    z, id, numeric, email, passwordInput, newPassword, text, date, amount,
+    oneOf, bool, optionalText, optionalEmail, phone, emptyToNull, time
+};

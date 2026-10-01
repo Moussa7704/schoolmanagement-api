@@ -1,4 +1,4 @@
-const { z, id, numeric, text, date } = require("./common");
+const { z, id, numeric, text, date, oneOf, bool } = require("./common");
 
 // Schémas de la vie scolaire : évaluations, notes, présences, bulletins.
 // Seule la FORME est vérifiée ici ; les règles métier (note ≤ barème de
@@ -9,11 +9,6 @@ const ASSESSMENT_TYPES = ["DEVOIR", "COMPOSITION"];
 const SESSIONS = ["MORNING", "AFTERNOON"];
 const STATUSES = ["PRESENT", "ABSENT", "LATE"];
 
-const oneOf = (values) =>
-    z.enum(values, {
-        errorMap: () => ({ message: `doit valoir ${values.join(", ")}` })
-    });
-
 const number = (rules) => numeric("doit être un nombre", (n) => rules(n.finite("doit être un nombre")));
 
 // Note : 0 au minimum ; le maximum réel (barème de l'évaluation) est vérifié
@@ -21,8 +16,6 @@ const number = (rules) => numeric("doit être un nombre", (n) => rules(n.finite(
 const score = number((n) => n.min(0, "ne peut pas être négative").max(1000, "est trop élevée"));
 const coefficient = number((n) => n.positive("doit être supérieur à 0").max(100, "est trop élevé"));
 const maxScore = number((n) => n.positive("doit être supérieur à 0").max(1000, "est trop élevé"));
-
-const bool = z.boolean({ invalid_type_error: "doit valoir true ou false" });
 
 // Motif d'absence : facultatif, peut être vidé ("" ou null).
 const reason = z

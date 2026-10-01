@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { validateIdParam } = require("../middlewares/validate")
+const { validate, validateIdParam } = require("../middlewares/validate")
+const schemas = require("../validators/people")
 
 // Tout « :id » de ces adresses doit être un entier positif (sinon 400).
 router.param('id', validateIdParam)
@@ -27,6 +28,7 @@ router.put(
     "/:id/permissions",
     authenticate,
     authorize(permissions.PERMISSIONS_MANAGE),
+    validate(schemas.updateRolePermissions),
     roleController.updateRolePermissions
 );
 
