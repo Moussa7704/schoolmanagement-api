@@ -1,12 +1,19 @@
 const { Op } = require("sequelize")
-const { Attendance, Student, Class, AcademicYear, TeacherAssignment, Enrollment, Period } = require("../models")
+const { Attendance, Student, Class, AcademicYear, TeacherAssignment, Enrollment, Period, sequelize } = require("../models")
 const BaseService = require("./base-service");
 const HttpError = require("../utils/httpError");
 const roles = require("../constants/roles");
+const permissions = require("../constants/permissions");
 const { isParent, getChildStudentIds, assertParentCanAccessStudent } = require("../utils/parentAccess");
 
 const isSuperAdmin = (currentUser) => currentUser?.Role?.name === roles.SUPER_ADMIN;
 const isTeacher = (currentUser) => currentUser?.Role?.name === roles.TEACHER;
+// Corriger un appel déjà saisi revient à modifier des présences existantes.
+const canUpdate = (currentUser) => isSuperAdmin(currentUser)
+    || (currentUser?.Role?.Permissions ?? []).some((p) => p.name === permissions.ATTENDANCES_UPDATE);
+
+const SESSIONS = ['MORNING', 'AFTERNOON'];
+const STATUSES = ['PRESENT', 'ABSENT', 'LATE'];
 
 class AttendanceService extends BaseService {
     constructor() {
@@ -114,6 +121,79 @@ class AttendanceService extends BaseService {
             justified: justified ?? false,
             reason
         });
+    }
+
+    // Appel d'une classe : enregistre en une fois le statut de chaque élève pour
+    // une date et une séance. Une présence déjà saisie pour ce créneau est mise
+    // à jour (correction de l'appel) plutôt que dupliquée. Tout ou rien : une
+    // seule ligne invalide annule l'ensemble.
+    async rollCall(data, currentUser) {
+        const { class_id, date, session, entries } = data;
+
+        if (!class_id || !date || !session) {
+            throw new HttpError("class_id, date et session sont requis.", 400);
+        }
+        if (!SESSIONS.includes(session)) {
+            throw new HttpError(`session doit valoir ${SESSIONS.join(" ou ")}.`, 400);
+        }
+        if (!Array.isArray(entries) || entries.length === 0) {
+            throw new HttpError("entries doit contenir au moins un élève.", 400);
+        }
+
+        await this._assertClassAccess(class_id, currentUser);
+
+        const studentIds = entries.map((e) => e.student_id);
+        if (studentIds.some((id) => !id) || new Set(studentIds).size !== studentIds.length) {
+            throw new HttpError("Chaque élève doit apparaître une seule fois, avec son student_id.", 400);
+        }
+        for (const entry of entries) {
+            if (entry.status !== undefined && !STATUSES.includes(entry.status)) {
+                throw new HttpError(`status doit valoir ${STATUSES.join(", ")}.`, 400);
+            }
+        }
+
+        // Tous les élèves doivent être dans la classe (actifs ou redoublants).
+        const enrolled = await Enrollment.findAll({
+            where: { class_id, student_id: studentIds, status: ['ACTIVE', 'REPEATING'] },
+            attributes: ["student_id"]
+        });
+        const enrolledIds = new Set(enrolled.map((e) => e.student_id));
+        const notEnrolled = studentIds.filter((id) => !enrolledIds.has(id));
+        if (notEnrolled.length) {
+            throw new HttpError(`Élève(s) non inscrit(s) dans cette classe : ${notEnrolled.join(", ")}.`, 400);
+        }
+
+        const existing = await this.model.findAll({ where: { class_id, date, session, student_id: studentIds } });
+        const existingByStudent = new Map(existing.map((a) => [a.student_id, a]));
+        if (existing.length && !canUpdate(currentUser)) {
+            throw new HttpError("L'appel de ce créneau existe déjà et vous n'avez pas le droit de le modifier.", 403);
+        }
+
+        const t = await sequelize.transaction();
+        try {
+            const saved = [];
+            for (const entry of entries) {
+                const values = {
+                    status: entry.status ?? 'PRESENT',
+                    // Une absence justifiée n'a de sens que si l'élève n'est pas présent.
+                    justified: (entry.status ?? 'PRESENT') === 'PRESENT' ? false : Boolean(entry.justified),
+                    reason: entry.reason || null
+                };
+                const current = existingByStudent.get(entry.student_id);
+                saved.push(current
+                    ? await current.update(values, { transaction: t })
+                    : await this.model.create({ student_id: entry.student_id, class_id, date, session, ...values }, { transaction: t }));
+            }
+            await t.commit();
+            return {
+                created: entries.length - existing.length,
+                updated: existing.length,
+                attendances: saved
+            };
+        } catch (err) {
+            await t.rollback();
+            throw err;
+        }
     }
 
     async list(currentUser, query = {}) {
