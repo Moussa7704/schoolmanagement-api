@@ -79,14 +79,25 @@ class TuitionFeeService extends BaseService {
             }
         } else if (isParent(currentUser)) {
             where.student_id = await getChildStudentIds(currentUser);
-        } else if (query.academic_year_id) {
-            where.academic_year_id = query.academic_year_id;
         } else if (!isSuperAdmin(currentUser)) {
             const students = await Student.findAll({
                 where: { school_id: currentUser.school_id },
                 attributes: ["id"]
             });
             where.student_id = students.map((s) => s.id);
+        }
+
+        // Filtre par année scolaire : toujours EN PLUS du cloisonnement ci-dessus,
+        // jamais à sa place (sinon une autre école lisait les échéances de l'année
+        // d'une autre école). Une année d'une autre école est refusée explicitement.
+        if (query.academic_year_id) {
+            if (!isSuperAdmin(currentUser) && !isParent(currentUser)) {
+                const academicYear = await AcademicYear.findByPk(query.academic_year_id);
+                if (!academicYear || academicYear.school_id !== currentUser.school_id) {
+                    throw new HttpError("Accès refusé", 403);
+                }
+            }
+            where.academic_year_id = query.academic_year_id;
         }
 
         const tuitionFees = await this.model.findAll({

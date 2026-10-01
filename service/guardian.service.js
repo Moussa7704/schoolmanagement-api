@@ -101,6 +101,21 @@ class GuardianService extends BaseService {
     async delete(id, currentUser) {
         const guardian = await this.getById(id, currentUser);
 
+        // Un tuteur peut avoir des enfants dans plusieurs écoles : une école ne
+        // supprime pas une fiche (et son compte parent) dont dépend une autre école.
+        if (!isSuperAdmin(currentUser)) {
+            const links = await StudentGuardian.findAll({
+                where: { guardian_id: guardian.id },
+                include: [{ model: Student, attributes: ["school_id"] }]
+            });
+            if (links.some((link) => link.Student?.school_id !== currentUser.school_id)) {
+                throw new HttpError(
+                    "Ce tuteur est aussi rattaché à des élèves d'une autre école : retirez seulement ses rattachements à vos élèves.",
+                    403
+                );
+            }
+        }
+
         const t = await sequelize.transaction();
         try {
             const userId = guardian.user_id;
