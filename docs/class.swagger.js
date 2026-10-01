@@ -171,7 +171,7 @@
  * /classes/{id}/students/export:
  *   get:
  *     summary: Exporter la liste des élèves inscrits dans la classe (PDF)
- *     description: Élèves dont l'inscription est ACTIVE ou REPEATING, triés par nom. Colonnes : N°, matricule, nom, prénom, sexe, date de naissance, n° d'inscription. PDF A4 paysage : en-tête avec école, classe, année scolaire et effectif garçons/filles ; titres de colonnes répétés et numéro de page sur chaque page.
+ *     description: "Élèves dont l'inscription est ACTIVE ou REPEATING, triés par nom. Colonnes : N°, matricule, nom, prénom, sexe, date de naissance, n° d'inscription. PDF A4 paysage : en-tête avec école, classe, année scolaire et effectif garçons/filles ; titres de colonnes répétés et numéro de page sur chaque page."
  *     tags: [Classes]
  *     security:
  *       - bearerAuth: []
