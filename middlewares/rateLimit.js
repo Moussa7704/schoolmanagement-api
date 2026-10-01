@@ -50,4 +50,16 @@ const otpLimiter = rateLimit(
     )
 );
 
-module.exports = { authIpLimiter, loginLimiter, otpLimiter };
+// Rafraîchissement de session : 30 demandes / 15 min par session (cookie
+// refreshToken) et par IP. Un onglet normal rafraîchit une fois par durée de vie
+// du jeton d'accès (15 min) : 30 laisse une très large marge, mais empêche de
+// marteler la route. Sans cookie, toutes les demandes d'une IP partagent un seul compteur.
+const refreshLimiter = rateLimit(
+    options(
+        "Trop de demandes de session. Réessayez dans quelques minutes.",
+        30,
+        (req) => `${req.ip}|${String(req.cookies?.refreshToken ?? "").slice(-32)}`
+    )
+);
+
+module.exports = { authIpLimiter, loginLimiter, otpLimiter, refreshLimiter };
