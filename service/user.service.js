@@ -13,6 +13,12 @@ const MANAGEABLE_ROLES = [roles.SCHOOL_ADMIN, roles.DIRECTOR, roles.ACCOUNTANT, 
 
 const SAFE_ATTRIBUTES = { exclude: ["password"] };
 
+// Rôle et nom de l'école de chaque utilisateur (colonne « École » de la liste).
+const USER_INCLUDE = [
+    { model: Role, as: "Role" },
+    { model: School, as: "School", attributes: ["id", "name"] }
+];
+
 class UserService extends BaseService {
     constructor() {
         super(User);
@@ -78,7 +84,7 @@ class UserService extends BaseService {
 
         return this.model.findAll({
             where,
-            include: [{ model: Role, as: "Role" }],
+            include: USER_INCLUDE,
             attributes: SAFE_ATTRIBUTES,
             order: [["id", "ASC"]]
         });
@@ -86,7 +92,7 @@ class UserService extends BaseService {
 
     async _findWithAccess(id, currentUser) {
         const user = await this.model.findByPk(id, {
-            include: [{ model: Role, as: "Role" }],
+            include: USER_INCLUDE,
             attributes: SAFE_ATTRIBUTES
         });
 
