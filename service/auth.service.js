@@ -33,13 +33,38 @@ class AuthService extends BaseService {
         return crypto.randomInt(100000, 1000000).toString();
     }
 
-    // Le code n'est jamais stocké en clair : HMAC avec une clé serveur, lié à
-    // l'utilisateur (un même code chez deux utilisateurs donne deux empreintes).
+    // Code en clair en base : réservé au développement (tests avec de fausses
+    // adresses e-mail, on lit le code directement dans la table Otps). Il faut
+    // l'activer explicitement (OTP_DEV_PLAIN_CODES=true) et il est refusé d'office
+    // en production : un oubli de configuration ne peut jamais exposer les codes.
+    _plainOtpAllowed() {
+        return process.env.OTP_DEV_PLAIN_CODES === "true" && process.env.NODE_ENV !== "production";
+    }
+
+    // En temps normal, le code n'est jamais stocké en clair : HMAC avec une clé
+    // serveur, lié à l'utilisateur (un même code chez deux utilisateurs donne
+    // deux empreintes).
     _hashOtpCode(userId, code) {
         return crypto
             .createHmac("sha256", `${process.env.ACCESS_SECRET}::otp`)
             .update(`${userId}:${code}`)
             .digest("hex");
+    }
+
+    _storedOtpCode(userId, code) {
+        return this._plainOtpAllowed() ? code : this._hashOtpCode(userId, code);
+    }
+
+    // Compare le code saisi à la valeur en base, en temps constant. Une valeur en
+    // clair (6 chiffres) n'est acceptée que si le mode développement est actif.
+    _otpMatches(stored, userId, code) {
+        const isPlain = /^\d{6}$/.test(stored);
+        if (isPlain && !this._plainOtpAllowed()) {
+            return false;
+        }
+        const expected = isPlain ? Buffer.from(stored) : Buffer.from(stored, "hex");
+        const received = isPlain ? Buffer.from(code) : Buffer.from(this._hashOtpCode(userId, code), "hex");
+        return expected.length === received.length && crypto.timingSafeEqual(expected, received);
     }
 
     _userIdFromChallenge(otpToken) {
@@ -62,7 +87,7 @@ class AuthService extends BaseService {
         const expiresAt = new Date(Date.now() + OTP_TTL_MS);
         await Otp.create({
             user_id: user.id,
-            code: this._hashOtpCode(user.id, code),
+            code: this._storedOtpCode(user.id, code),
             type: OTP_TYPE,
             expires_at: expiresAt,
             attempts: 0,
@@ -149,12 +174,7 @@ class AuthService extends BaseService {
             throw new HttpError("Trop de codes incorrects. Demandez un nouveau code ou reconnectez-vous.", 429);
         }
 
-        // Comparaison en temps constant des deux empreintes.
-        const expected = Buffer.from(otp.code, "hex");
-        const received = Buffer.from(this._hashOtpCode(userId, String(code)), "hex");
-        const matches = expected.length === received.length && crypto.timingSafeEqual(expected, received);
-
-        if (!matches) {
+        if (!this._otpMatches(otp.code, userId, String(code))) {
             const attempts = otp.attempts + 1;
             await otp.update({ attempts });
             if (attempts >= OTP_MAX_ATTEMPTS) {

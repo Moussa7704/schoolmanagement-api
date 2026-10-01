@@ -29,12 +29,12 @@ const authIpLimiter = rateLimit(
     options("Trop de demandes depuis votre réseau. Réessayez dans quelques minutes.", 200)
 );
 
-// Connexion et mot de passe oublié : 10 demandes / 15 min par adresse e-mail et par IP.
+// Connexion et mot de passe oublié : 5 demandes / 15 min par adresse e-mail et par IP.
 // Un compte qui se trompe ne bloque que lui-même, pas les autres comptes du réseau.
 const loginLimiter = rateLimit(
     options(
         "Trop de tentatives pour ce compte. Réessayez dans quelques minutes.",
-        10,
+        5,
         (req) => `${req.ip}|${normalizedEmail(req)}`
     )
 );
