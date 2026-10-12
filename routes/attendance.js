@@ -24,6 +24,14 @@ router.post('/roll-call',
     attendanceController.rollCall
 )
 
+// Suppression de l'appel d'un créneau (classe + date + séance) fait par erreur.
+router.delete('/roll-call',
+    authenticate,
+    authorize(permissions.ATTENDANCES_DELETE),
+    validate(schemas.rollCallSlot),
+    attendanceController.deleteRollCall
+)
+
 router.get('/stats',
     authenticate,
     authorize(permissions.ATTENDANCES_VIEW),

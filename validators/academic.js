@@ -105,6 +105,11 @@ const rollCall = {
     })
 };
 
+// Créneau d'appel (classe + date + séance), passé dans l'adresse.
+const rollCallSlot = {
+    query: z.object({ class_id: id, date, session: oneOf(SESSIONS) })
+};
+
 const attendanceStats = {
     query: z.object({ student_id: id, period_id: id })
 };
@@ -128,6 +133,7 @@ module.exports = {
     createAttendance,
     updateAttendance,
     rollCall,
+    rollCallSlot,
     attendanceStats,
     createReportCard,
     classPeriodQuery

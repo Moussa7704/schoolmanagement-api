@@ -128,9 +128,28 @@ const rollCall = async (req, res) => {
     }
 };
 
+const deleteRollCall = async (req, res) => {
+    try {
+        const result = await attendanceService.deleteRollCall(req.query, req.user);
+
+        return sendResponse(res, {
+            message: `Appel supprimé : ${result.deleted} présence(s) retirée(s)`,
+            data: result
+        });
+
+    } catch (err) {
+        return sendResponse(res, {
+            success: false,
+            message: err.message,
+            status: err.status || 400
+        });
+    }
+};
+
 module.exports = {
     createAttendance,
     rollCall,
+    deleteRollCall,
     listAttendances,
     getAttendanceStats,
     getAttendanceById,

@@ -196,6 +196,22 @@ class AttendanceService extends BaseService {
         }
     }
 
+    // Annule l'appel d'un créneau fait par erreur (ex. mauvaise séance choisie) :
+    // supprime en une fois toutes les présences de la classe pour cette date et
+    // cette séance.
+    async deleteRollCall(query, currentUser) {
+        const { class_id, date, session } = query;
+
+        await this._assertClassAccess(class_id, currentUser);
+
+        const deleted = await this.model.destroy({ where: { class_id, date, session } });
+        if (!deleted) {
+            throw new HttpError("Aucun appel enregistré pour ce créneau.", 404);
+        }
+
+        return { deleted };
+    }
+
     async list(currentUser, query = {}) {
         const where = {};
 

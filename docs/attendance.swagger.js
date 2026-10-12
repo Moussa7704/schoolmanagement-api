@@ -104,6 +104,39 @@
  *         description: Données invalides ou élève non inscrit dans la classe
  *       403:
  *         description: Classe hors de portée, ou correction d'un appel sans attendances.update
+ *   delete:
+ *     summary: Supprimer l'appel d'un créneau (classe + date + séance)
+ *     description: "Annule un appel fait par erreur (ex. mauvaise séance) : toutes les présences de la classe pour cette date et cette séance sont supprimées. Un TEACHER ne peut le faire que dans ses propres classes."
+ *     tags: [Présences]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: class_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: session
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [MORNING, AFTERNOON]
+ *     responses:
+ *       200:
+ *         description: "Appel supprimé { deleted }"
+ *       400:
+ *         description: Paramètres manquants ou invalides
+ *       403:
+ *         description: Classe hors de portée
+ *       404:
+ *         description: Aucun appel enregistré pour ce créneau
  */
 
 /**
