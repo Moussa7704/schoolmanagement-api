@@ -46,7 +46,8 @@ async function fixture() {
     B.schedule = await m.Schedule.create({ teacher_assignment_id: B.assignment.id, day_of_week: "MONDAY", start_time: "08:00:00", end_time: "10:00:00" });
     B.fee = await m.TuitionFee.create({ student_id: B.student.id, academic_year_id: B.year.id, label: "Tranche B", amount: 50000, due_date: "2026-10-30" });
     B.payment = await m.Payment.create({ tuition_fee_id: B.fee.id, amount: 10000, payment_date: "2026-10-01", method: "ESPECES" });
-    B.reportCard = await m.ReportCard.create({ student_id: B.student.id, class_id: B.cls.id, period_id: B.period.id, status: "DRAFT", generated_at: new Date() });
+    B.reportCard = await m.ReportCard.create({ student_id: B.student.id, class_id: B.cls.id, period_id: B.period.id, academic_year_id: B.year.id, status: "DRAFT", generated_at: new Date() });
+    B.annualReportCard = await m.ReportCard.create({ student_id: B.student.id, class_id: B.cls.id, period_id: null, academic_year_id: B.year.id, type: "ANNUAL", status: "DRAFT", generated_at: new Date() });
     B.guardian = await m.Guardian.create({ first_name: "Tuteur", last_name: "B" });
     B.link = await m.StudentGuardian.create({ student_id: B.student.id, guardian_id: B.guardian.id, relationship: "PERE", is_primary_contact: true });
 
@@ -128,7 +129,7 @@ async function cleanup() {
 
         const ay = B.year.id, p = B.period.id, c = B.cls.id, s = B.subject.id, t = B.teacher.id, st = B.student.id;
         const e = B.enrollment.id, ta = B.assignment.id, a = B.assessment.id, g = B.grade.id, at = B.attendance.id;
-        const sc = B.schedule.id, tf = B.fee.id, pay = B.payment.id, rc = B.reportCard.id, gu = B.guardian.id, u = B.staffUser.id, link = B.link.id;
+        const sc = B.schedule.id, tf = B.fee.id, pay = B.payment.id, rc = B.reportCard.id, arc = B.annualReportCard.id, gu = B.guardian.id, u = B.staffUser.id, link = B.link.id;
 
         // Lecture
         for (const [label, path] of [
@@ -139,7 +140,9 @@ async function cleanup() {
             ["stats présence", `/attendances/stats?student_id=${st}&period_id=${p}`], ["créneau", `/schedules/${sc}`], ["échéance", `/tuition-fees/${tf}`],
             ["facture (PDF)", `/tuition-fees/${tf}/invoice`], ["paiement", `/payments/${pay}`], ["reçu (PDF)", `/payments/${pay}/receipt`],
             ["bulletin", `/report-cards/${rc}`], ["bulletin (PDF)", `/report-cards/${rc}/pdf`], ["bulletins de classe (PDF)", `/report-cards/class-pdf?class_id=${c}&period_id=${p}`],
-            ["classement", `/report-cards/ranking?class_id=${c}&period_id=${p}`], ["tuteur", `/guardians/${gu}`], ["utilisateur", `/users/${u}`]
+            ["classement", `/report-cards/ranking?class_id=${c}&period_id=${p}`], ["bulletin annuel", `/report-cards/${arc}`],
+            ["bulletin annuel (PDF)", `/report-cards/${arc}/pdf`], ["bulletins annuels de classe (PDF)", `/report-cards/class-pdf?class_id=${c}&type=ANNUAL`],
+            ["classement annuel", `/report-cards/ranking?class_id=${c}&type=ANNUAL`], ["tuteur", `/guardians/${gu}`], ["utilisateur", `/users/${u}`]
         ]) await probe(`lire ${label}`, "GET", path);
 
         // Listes filtrées sur des identifiants de l'école B (doivent être refusées ou vides)
@@ -152,7 +155,8 @@ async function cleanup() {
             ["classes de l'année B", `/classes?academic_year_id=${ay}`], ["périodes de l'année B", `/periods?academic_year_id=${ay}`],
             ["évaluations de l'affectation B", `/assessments?teacher_assignment_id=${ta}`], ["affectations de la classe B", `/teacher-assignments?class_id=${c}`],
             ["créneaux de la classe B", `/schedules?class_id=${c}`], ["créneaux de l'enseignant B", `/schedules?teacher_id=${t}`],
-            ["bulletins de la classe B", `/report-cards?class_id=${c}`], ["bulletins de l'élève B", `/report-cards?student_id=${st}`]
+            ["bulletins de la classe B", `/report-cards?class_id=${c}`], ["bulletins de l'élève B", `/report-cards?student_id=${st}`],
+            ["bulletins annuels de l'année B", `/report-cards?academic_year_id=${ay}&type=ANNUAL`]
         ]) await probe(`lister ${label}`, "GET", path, undefined, { listMustBeEmpty: true });
 
         // Créations qui pointent vers l'école B
@@ -166,6 +170,7 @@ async function cleanup() {
         await probe("créer un créneau sur l'affectation B", "POST", "/schedules", { teacher_assignment_id: ta, day_of_week: "TUESDAY", start_time: "08:00:00", end_time: "09:00:00" });
         await probe("créer une affectation dans la classe B", "POST", "/teacher-assignments", { teacher_id: t, class_id: c, subject_id: s });
         await probe("créer un bulletin pour l'élève B", "POST", "/report-cards", { student_id: st, period_id: p });
+        await probe("créer un bulletin annuel pour l'élève B", "POST", "/report-cards", { student_id: st, type: "ANNUAL", academic_year_id: ay });
         await probe("rattacher un tuteur à l'élève B", "POST", "/student-guardians", { student_id: st, guardian_id: gu, relationship: "PERE" });
         await probe("créer une classe dans l'année B", "POST", "/classes", { academic_year_id: ay, name: "pirate" });
         await probe("créer une période dans l'année B", "POST", "/periods", { academic_year_id: ay, label: "pirate", start_date: "2027-01-01", end_date: "2027-03-01" });
@@ -191,7 +196,8 @@ async function cleanup() {
         // Suppressions (en dernier)
         for (const [label, path] of [
             ["paiement", `/payments/${pay}`], ["note", `/grades/${g}`], ["présence", `/attendances/${at}`], ["créneau", `/schedules/${sc}`],
-            ["bulletin", `/report-cards/${rc}`], ["rattachement tuteur", `/student-guardians/${link}`], ["tuteur", `/guardians/${gu}`],
+            ["appel de la classe B", `/attendances/roll-call?class_id=${c}&date=2026-10-01&session=MORNING`],
+            ["bulletin", `/report-cards/${rc}`], ["bulletin annuel", `/report-cards/${arc}`], ["rattachement tuteur", `/student-guardians/${link}`], ["tuteur", `/guardians/${gu}`],
             ["échéance", `/tuition-fees/${tf}`], ["évaluation", `/assessments/${a}`], ["affectation", `/teacher-assignments/${ta}`],
             ["inscription", `/enrollments/${e}`], ["utilisateur", `/users/${u}`], ["élève", `/students/${st}`], ["enseignant", `/teachers/${t}`],
             ["matière", `/subjects/${s}`], ["période", `/periods/${p}`], ["classe", `/classes/${c}`], ["année scolaire", `/academic-years/${ay}`]
