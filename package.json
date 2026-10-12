@@ -14,7 +14,8 @@
     "undo-all": "sequelize db:migrate:undo:all",
     "seed": "sequelize db:seed:all",
     "fresh": "npm run undo-all && npm run migrate && npm run seed && npm run start",
-    "test:securite": "node tests/securite-ecoles.js"
+    "test:securite": "node tests/securite-ecoles.js",
+    "test:moyennes": "node --test tests/moyennes.test.js"
   },
   "dependencies": {
     "archiver": "^7.0.1",

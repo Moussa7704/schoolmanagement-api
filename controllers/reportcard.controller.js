@@ -59,7 +59,7 @@ const getReportCardById = async (req, res) => {
 
 const getClassRanking = async (req, res) => {
     try {
-        const ranking = await reportCardService.getClassRanking(req.query.class_id, req.query.period_id, req.user);
+        const ranking = await reportCardService.getClassRanking(req.query.class_id, req.query.period_id, req.user, req.query.type);
 
         return sendResponse(res, {
             message: "Classement récupéré avec succès",
@@ -133,7 +133,7 @@ const downloadReportCardPdf = async (req, res) => {
 const downloadClassReportCardsPdf = async (req, res) => {
     try {
         const { buffer, filename } = await reportCardPdfService.generateForClass(
-            req.query.class_id, req.query.period_id, req.user
+            req.query.class_id, req.query.period_id, req.user, req.query.type
         );
 
         res.set({

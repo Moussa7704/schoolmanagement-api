@@ -1,7 +1,7 @@
 const {
     School, AcademicYear, Class, Student, Teacher, Enrollment,
     TeacherAssignment, Assessment, Attendance, TuitionFee, Payment,
-    Period, ReportCard
+    ReportCard
 } = require("../models")
 const roles = require("../constants/roles");
 const { getChildStudentIds } = require("../utils/parentAccess");
@@ -275,11 +275,10 @@ class DashboardService {
                 (p) => p.amount
             );
 
-            const periods = await Period.findAll({ where: { academic_year_id: currentAcademicYear.id }, attributes: ["id"] });
-            const periodIds = periods.map((p) => p.id);
+            // Bulletins trimestriels et annuels de l'année en cours.
             const [validated_count, draft_count] = await Promise.all([
-                ReportCard.count({ where: { period_id: periodIds, status: 'VALIDATED' } }),
-                ReportCard.count({ where: { period_id: periodIds, status: 'DRAFT' } })
+                ReportCard.count({ where: { academic_year_id: currentAcademicYear.id, status: 'VALIDATED' } }),
+                ReportCard.count({ where: { academic_year_id: currentAcademicYear.id, status: 'DRAFT' } })
             ]);
             report_cards = { validated_count, draft_count };
         }

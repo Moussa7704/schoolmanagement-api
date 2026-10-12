@@ -116,13 +116,41 @@ const attendanceStats = {
 
 // --- Bulletins -------------------------------------------------------------
 
+const REPORT_CARD_TYPES = ["TRIMESTER", "ANNUAL"];
+
+// Trimestriel : period_id requis. Annuel : academic_year_id requis.
 const createReportCard = {
-    body: z.object({ student_id: id, period_id: id })
+    body: z
+        .object({
+            student_id: id,
+            type: oneOf(REPORT_CARD_TYPES).optional(),
+            period_id: id.optional(),
+            academic_year_id: id.optional()
+        })
+        .superRefine((value, ctx) => {
+            if (value.type === "ANNUAL" && !value.academic_year_id) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["academic_year_id"], message: "est requis pour un bulletin annuel" });
+            }
+            if (value.type !== "ANNUAL" && !value.period_id) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["period_id"], message: "est requis pour un bulletin trimestriel" });
+            }
+        })
 };
 
-// Classement et bulletins d'une classe : la classe ET la période sont requises.
+// Classement et bulletins d'une classe : la classe, et la période sauf pour
+// l'annuel (type=ANNUAL : l'année est celle de la classe).
 const classPeriodQuery = {
-    query: z.object({ class_id: id, period_id: id })
+    query: z
+        .object({
+            class_id: id,
+            period_id: id.optional(),
+            type: oneOf(REPORT_CARD_TYPES).optional()
+        })
+        .superRefine((value, ctx) => {
+            if (value.type !== "ANNUAL" && !value.period_id) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["period_id"], message: "est requis" });
+            }
+        })
 };
 
 module.exports = {

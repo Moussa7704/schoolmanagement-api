@@ -34,6 +34,25 @@ const COLUMNS = [
     { header: "Appréciations", key: "appreciation", width: 113, align: "left" }
 ];
 
+// Bulletin annuel : une colonne par trimestre (T1, T2, T3…) puis la moyenne
+// annuelle de la matière ; l'appréciation prend la largeur restante.
+function columnsFor(data) {
+    if (data.type !== "ANNUAL") return COLUMNS;
+    const columns = [
+        { header: "Matières", key: "subject_name", width: 140, align: "left" },
+        ...(data.terms || []).map((_, i) => ({
+            header: `T${i + 1}`, key: `term_${i}`, width: 45, number: true,
+            value: (subject) => subject.term_averages?.[i] ?? null
+        })),
+        { header: "Moy An", key: "average", width: 50, number: true },
+        { header: "Coeff", key: "coefficient", width: 40, number: true, integerLike: true },
+        { header: "Moy Gen", key: "weighted_average", width: 55, number: true }
+    ];
+    const used = columns.reduce((sum, c) => sum + c.width, 0);
+    columns.push({ header: "Appréciations", key: "appreciation", width: BULLETIN_WIDTH - used, align: "left" });
+    return columns;
+}
+
 // 12.5 -> "12,50" ; 4 -> "4" pour les coefficients entiers ; null -> ""
 const formatNumber = (value, integerLike = false) => {
     if (value === null || value === undefined) return "";
@@ -85,6 +104,8 @@ function checklist(doc, x, y, width, labels, selected) {
 // Dessine un bulletin complet dans le repère courant, coin haut-gauche en
 // (0, 0), sur BULLETIN_WIDTH de large. Renvoie la hauteur utilisée.
 function drawBulletin(doc, { data, student, classRecord, period, academicYear, school, enrollment }) {
+    const annual = data.type === "ANNUAL";
+    const columns = columnsFor(data);
     // En-tête officiel : ministère, académie et école à gauche ; République,
     // devise et téléphone de l'école à droite. Les lignes absentes (académie
     // ou téléphone non renseignés) sont simplement omises.
@@ -117,7 +138,8 @@ function drawBulletin(doc, { data, student, classRecord, period, academicYear, s
     let y = Math.max(headerBlock(leftLines, 0), headerBlock(rightLines, BULLETIN_WIDTH - columnWidth));
 
     y += 10;
-    y = centered(doc, `BULLETIN DE NOTES — ${period?.label || ""}`.trim(), y, { font: "Helvetica-Bold", size: 13 });
+    const title = annual ? "BULLETIN ANNUEL" : `BULLETIN DE NOTES — ${period?.label || ""}`.trim();
+    y = centered(doc, title, y, { font: "Helvetica-Bold", size: 13 });
     y = centered(doc, `Année scolaire : ${academicYear?.label || "-"}`, y, { size: 10 });
 
     // Identité de l'élève.
@@ -141,7 +163,7 @@ function drawBulletin(doc, { data, student, classRecord, period, academicYear, s
     // Tableau des matières.
     y += 12;
     let x = 0;
-    for (const column of COLUMNS) {
+    for (const column of columns) {
         cell(doc, x, y, column.width, ROW_HEIGHT, column.header, { bold: true, fill: COLORS.headerFill });
         x += column.width;
     }
@@ -149,8 +171,8 @@ function drawBulletin(doc, { data, student, classRecord, period, academicYear, s
 
     for (const subject of data.subjects) {
         x = 0;
-        for (const column of COLUMNS) {
-            const raw = subject[column.key];
+        for (const column of columns) {
+            const raw = column.value ? column.value(subject) : subject[column.key];
             const text = column.number ? formatNumber(raw, column.integerLike) : (raw || "");
             cell(doc, x, y, column.width, ROW_HEIGHT, text, { align: column.align || "center", bold: column.key === "subject_name" });
             x += column.width;
@@ -163,9 +185,9 @@ function drawBulletin(doc, { data, student, classRecord, period, academicYear, s
     }
 
     // TOTAL : total des coefficients et des Moy Gen (matières notées).
-    const offsetOf = (key) => COLUMNS.slice(0, COLUMNS.findIndex((c) => c.key === key)).reduce((s, c) => s + c.width, 0);
-    const coeffCol = COLUMNS.find((c) => c.key === "coefficient");
-    const genCol = COLUMNS.find((c) => c.key === "weighted_average");
+    const offsetOf = (key) => columns.slice(0, columns.findIndex((c) => c.key === key)).reduce((s, c) => s + c.width, 0);
+    const coeffCol = columns.find((c) => c.key === "coefficient");
+    const genCol = columns.find((c) => c.key === "weighted_average");
     cell(doc, 0, y, offsetOf("coefficient"), ROW_HEIGHT, "TOTAL", { bold: true, align: "left", fill: COLORS.totalFill });
     cell(doc, offsetOf("coefficient"), y, coeffCol.width, ROW_HEIGHT, formatNumber(data.total_coefficient, true), { bold: true, fill: COLORS.totalFill });
     cell(doc, offsetOf("weighted_average"), y, genCol.width, ROW_HEIGHT, formatNumber(data.total_weighted), { bold: true, fill: COLORS.totalFill });
@@ -173,9 +195,20 @@ function drawBulletin(doc, { data, student, classRecord, period, academicYear, s
     cell(doc, restX, y, BULLETIN_WIDTH - restX, ROW_HEIGHT, "", { fill: COLORS.totalFill });
     y += ROW_HEIGHT;
 
+    // Bulletin annuel : moyenne générale de chaque trimestre.
+    if (annual && data.terms?.length) {
+        const termWidth = BULLETIN_WIDTH / data.terms.length;
+        data.terms.forEach((term, i) => {
+            const labelWidth = termWidth - 55;
+            cell(doc, i * termWidth, y, labelWidth, ROW_HEIGHT, `Moy. ${term.label}`, { align: "left", fill: COLORS.totalFill });
+            cell(doc, i * termWidth + labelWidth, y, 55, ROW_HEIGHT, formatNumber(term.overall_average), { bold: true });
+        });
+        y += ROW_HEIGHT;
+    }
+
     // Moyenne /20 | Rang | Retards | Absences
     const summary = [
-        { text: "Moyenne", width: 70, bold: true, align: "left" },
+        { text: annual ? "Moy. annuelle" : "Moyenne", width: 70, bold: true, align: "left" },
         { text: data.overall_average === null ? "" : `${formatNumber(data.overall_average)} /20`, width: 110, bold: true, size: 11 },
         { text: "Rang", width: 45, align: "left" },
         { text: data.rank ? String(data.rank) : "", width: 40, bold: true },
@@ -248,7 +281,7 @@ class ReportCardPdfService {
         const [student, classRecord, period] = await Promise.all([
             data.Student ? Promise.resolve(data.Student) : Student.findByPk(data.student_id),
             Class.findByPk(data.class_id),
-            Period.findByPk(data.period_id)
+            data.period_id ? Period.findByPk(data.period_id) : null
         ]);
         const academicYear = classRecord ? await AcademicYear.findByPk(classRecord.academic_year_id) : null;
         const school = academicYear ? await School.findByPk(academicYear.school_id) : null;
@@ -276,16 +309,18 @@ class ReportCardPdfService {
             doc.restore();
         });
 
-        const { student, period } = context;
+        const { student, period, academicYear } = context;
         const studentName = student ? `${student.last_name}-${student.first_name}` : String(context.data.student_id);
-        const filename = `bulletin-${slug(studentName)}-${slug(period?.label || "")}.pdf`.replace(/-\.pdf$/, ".pdf");
+        const filename = context.data.type === "ANNUAL"
+            ? `bulletin-annuel-${slug(studentName)}-${slug(academicYear?.label || "")}.pdf`.replace(/-\.pdf$/, ".pdf")
+            : `bulletin-${slug(studentName)}-${slug(period?.label || "")}.pdf`.replace(/-\.pdf$/, ".pdf");
         return { buffer, filename };
     }
 
     // Tous les bulletins d'une classe pour une période, deux par feuille :
     // A4 paysage, un bulletin réduit sur chaque moitié, trait de découpe au milieu.
-    async generateForClass(classId, periodId, currentUser) {
-        const details = await reportCardService.getClassDetails(classId, periodId, currentUser);
+    async generateForClass(classId, periodId, currentUser, type) {
+        const details = await reportCardService.getClassDetails(classId, periodId, currentUser, type);
         const contexts = [];
         for (const data of details) {
             contexts.push(await this._context(data));
@@ -321,8 +356,9 @@ class ReportCardPdfService {
             });
         });
 
-        const { classRecord, period } = contexts[0];
-        const filename = `bulletins-${slug(classRecord?.name || String(classId))}-${slug(period?.label || "")}.pdf`.replace(/-\.pdf$/, ".pdf");
+        const { classRecord, period, academicYear } = contexts[0];
+        const suffix = type === "ANNUAL" ? `annuels-${slug(academicYear?.label || "")}` : slug(period?.label || "");
+        const filename = `bulletins-${slug(classRecord?.name || String(classId))}-${suffix}.pdf`.replace(/-\.pdf$/, ".pdf");
         return { buffer, filename, count: contexts.length };
     }
 }

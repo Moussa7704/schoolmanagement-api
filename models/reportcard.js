@@ -22,6 +22,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "period_id",
         as: "Period"
       });
+      ReportCard.belongsTo(models.AcademicYear, {
+        foreignKey: "academic_year_id",
+        as: "AcademicYear"
+      });
       ReportCard.belongsTo(models.User, {
         foreignKey: "validated_by",
         as: "ValidatedBy"
@@ -31,7 +35,13 @@ module.exports = (sequelize, DataTypes) => {
   ReportCard.init({
     student_id: DataTypes.INTEGER,
     class_id: DataTypes.INTEGER,
+    // Vide pour un bulletin annuel.
     period_id: DataTypes.INTEGER,
+    academic_year_id: DataTypes.INTEGER,
+    type: {
+      type: DataTypes.ENUM('TRIMESTER', 'ANNUAL'),
+      defaultValue: 'TRIMESTER'
+    },
     status: {
       type: DataTypes.ENUM('DRAFT', 'VALIDATED'),
       defaultValue: 'DRAFT'
